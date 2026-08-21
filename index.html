@@ -47,6 +47,1228 @@ document.addEventListener('DOMContentLoaded', () => {
    Colors: Navy #0033A0, Gold #C9A84C, Green #2E7D32 (actions)
    ============================================================ */
 :root{
+  --navy:#0032A0; --navy-dk:#002280; --navy-lt:#1a4db3;
+  --primary:#0054A5; --primary-dk:#003f7d; --primary-lt:#1a6bbf;
+  --gold:#C9A84C; --gold-lt:#F5EDDA;
+  --green:#2E7D32; --green-lt:#E8F5E9; --green-bright:#4CAF50;
+  --red:#C0392B; --red-lt:#FFEBEE;
+  --orange:#E65100; --orange-lt:#FFF3E0;
+  --gray0:#F8F8F8; --gray1:#F0F0F0; --gray2:#E0E0E0;
+  --gray3:#BDBDBD; --gray4:#888; --gray5:#555;
+  --text:#1a1a1a; --white:#FFFFFF;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bot: env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--navy);color:var(--text);user-select:none}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:var(--gray0)}
+.screen.active{display:flex}
+
+/* ── PIN SCREEN ── */
+#pin-screen{background:var(--navy);align-items:center;justify-content:center;gap:0}
+.pin-logo{margin-bottom:32px;text-align:center}
+.pin-logo img{width:180px}
+.pin-title{color:var(--white);font-size:17px;font-weight:500;margin-bottom:8px;opacity:.8}
+.pin-subtitle{color:var(--white);font-size:13px;opacity:.5;margin-bottom:36px}
+.pin-dots{display:flex;gap:14px;margin-bottom:32px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:transparent;transition:background .15s}
+.pin-dot.filled{background:var(--white);border-color:var(--white)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,80px);gap:12px}
+.pin-btn{width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:28px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;transition:background .1s;font-family:inherit}
+.pin-btn:active{background:rgba(255,255,255,.2)}
+.pin-btn-sub{font-size:9px;letter-spacing:.08em;opacity:.5;font-weight:500}
+.pin-error{color:#FF6B6B;font-size:13px;margin-top:12px;min-height:18px}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--primary);color:var(--white);padding:calc(var(--safe-top) + 12px) 16px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:var(--white);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.topbar-title{font-size:17px;font-weight:600;flex:1}
+.topbar-right{font-size:13px;opacity:.7}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);padding:8px 0 calc(var(--safe-bot) + 8px);display:flex;flex-shrink:0;z-index:100}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;border:none;background:none;color:var(--gray4);font-family:inherit}
+.nav-item.active{color:var(--primary)}
+.nav-icon{font-size:22px;line-height:1}
+.nav-label{font-size:10px;font-weight:500;letter-spacing:.02em}
+
+/* ── HOME SCREEN ── */
+#home-screen{background:var(--primary)}
+.home-map-wrap{flex:0 0 42%;position:relative;overflow:hidden}
+#home-map{width:100%;height:100%}
+.home-bottom{flex:1;background:var(--primary);padding:16px 16px calc(var(--safe-bot) + 90px);overflow-y:auto}
+.home-start-bar{background:var(--white);border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.18);padding:14px 16px;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.home-search-icon{width:36px;height:36px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:16px;flex-shrink:0}
+.home-start-label{font-size:16px;font-weight:600;color:var(--text);flex:1}
+.home-origin{display:flex;align-items:center;gap:8px;padding:0;background:transparent;border-radius:10px;margin-bottom:0}
+.home-origin-icon{width:32px;height:32px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:14px}
+.home-origin-label{font-size:13px;font-weight:500;color:var(--text)}
+.home-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px}
+.home-tile{background:var(--navy);border-radius:14px;padding:18px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:background .15s,transform .1s;border:none;font-family:inherit;color:var(--white);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.home-tile:active{background:var(--navy-dk);transform:scale(.97)}
+.home-tile-icon{font-size:26px}
+.home-tile-label{font-size:12px;font-weight:600;letter-spacing:.02em;text-align:center}
+.home-tile-badge{background:var(--green-bright);color:var(--white);border-radius:10px;padding:2px 8px;font-size:10px;font-weight:600}
+
+/* ── TODAY SCREEN ── */
+.today-map-peek{flex:0 0 120px;position:relative;overflow:hidden}
+#today-map{width:100%;height:100%}
+.today-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot) + 90px)}
+.today-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.today-title{font-size:22px;font-weight:700;color:var(--text)}
+.today-meta{font-size:13px;color:var(--gray4)}
+.progress-bar{background:var(--gray2);border-radius:4px;height:6px;margin-bottom:16px;overflow:hidden}
+.progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
+.stop-card{background:var(--white);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;overflow:hidden;border:2px solid transparent;transition:border-color .2s}
+.stop-card.active{border-color:var(--green)}
+.stop-card.delivered{opacity:.55}
+.stop-card-inner{padding:14px 14px 12px}
+.stop-num{width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--white);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;flex-shrink:0}
+.stop-num.delivered-num{background:var(--green)}
+.stop-num.active-num{background:var(--green)}
+.stop-name{font-size:15px;font-weight:600;color:var(--text)}
+.stop-addr{font-size:12px;color:var(--gray4);margin-top:2px;line-height:1.4}
+.stop-order{font-size:11px;color:var(--navy);font-weight:500;margin-top:4px}
+.stop-note{font-size:11px;color:var(--orange);font-weight:500;margin-top:3px}
+.stop-actions{display:flex;gap:8px;margin-top:10px}
+.stop-btn{flex:1;padding:10px;border-radius:10px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-arrived{background:var(--navy);color:var(--white)}
+.btn-arrived:active{background:var(--navy-dk)}
+.btn-delivered{background:var(--green);color:var(--white)}
+.btn-delivered:active{background:var(--green-lt);color:var(--green)}
+.btn-navigate{background:var(--gray1);color:var(--navy);flex:0 0 auto;padding:10px 14px}
+.stop-delivered-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--green);font-weight:500}
+
+/* Arrival instructions panel */
+.instructions-panel{background:var(--gold-lt,#FFF8E7);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 12px;margin:8px 0;font-size:12px;color:var(--gray5);line-height:1.5}
+.instructions-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);margin-bottom:4px}
+
+/* ── THIS WEEK SCREEN ── */
+.week-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+90px)}
+.week-days{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.week-day-btn{flex:0 0 auto;padding:8px 14px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--gray4)}
+.week-day-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.week-day-btn.has-stops{border-color:var(--green);color:var(--green)}
+.week-day-btn.active.has-stops{background:var(--green);border-color:var(--green);color:var(--white)}
+.week-section-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:12px}
+.week-stop-item{background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.week-stop-drag{color:var(--gray3);font-size:18px;cursor:grab;padding:0 4px}
+.week-stop-info{flex:1;min-width:0}
+.week-stop-name{font-size:14px;font-weight:600;color:var(--text)}
+.week-stop-order{font-size:11px;color:var(--navy);margin-top:2px}
+.week-add-btn{width:100%;padding:14px;border-radius:12px;border:2px dashed var(--gray3);background:transparent;color:var(--gray4);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:4px}
+.week-add-btn:active{background:var(--gray1)}
+.push-route-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:var(--white);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:12px}
+.push-route-btn:active{background:var(--green-lt);color:var(--green)}
+
+/* ── ROUTES SCREEN ── */
+.routes-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+16px)}
+.route-zone-card{background:var(--white);border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.route-zone-hdr{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.route-zone-hdr:active{background:var(--gray0)}
+.route-zone-color{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.route-zone-name{font-size:15px;font-weight:600;flex:1}
+.route-zone-meta{font-size:12px;color:var(--gray4)}
+.route-zone-stops{padding:0 16px 12px;display:none}
+.route-zone-stops.open{display:block}
+.route-stop-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray1);font-size:13px;color:var(--gray5)}
+.route-stop-row:last-child{border-bottom:none}
+
+/* ── CONTACTS SCREEN ── */
+.contacts-search{padding:12px 16px;background:var(--white);border-bottom:1px solid var(--gray2)}
+.contacts-search input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--gray2);background:var(--gray0);font-size:15px;font-family:inherit;outline:none}
+.contacts-list{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-bot)+16px)}
+.contact-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--gray1);background:var(--white)}
+.contact-avatar{width:40px;height:40px;border-radius:50%;background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;flex-shrink:0}
+.contact-info{flex:1;min-width:0}
+.contact-name{font-size:15px;font-weight:500;color:var(--text)}
+.contact-role{font-size:12px;color:var(--gray4);margin-top:1px}
+.contact-biz{font-size:12px;color:var(--navy);margin-top:1px}
+.contact-call{width:40px;height:40px;border-radius:50%;background:var(--green-lt);border:none;color:var(--green);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none}
+
+/* ── ISSUES SCREEN ── */
+.issues-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+80px)}
+.issue-card{background:var(--white);border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.issue-time{font-size:11px;color:var(--gray3);margin-bottom:4px}
+.issue-text{font-size:14px;color:var(--text);line-height:1.5}
+.issue-fab{position:fixed;bottom:calc(var(--safe-bot) + 90px);right:20px;width:56px;height:56px;border-radius:50%;background:var(--navy);color:var(--white);border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 12px rgba(0,51,160,.4);display:flex;align-items:center;justify-content:center;z-index:50}
+.issue-input-wrap{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);padding:12px 16px calc(var(--safe-bot)+16px);display:none;z-index:200}
+.issue-input-wrap.open{display:block}
+.issue-textarea{width:100%;border:1px solid var(--gray2);border-radius:10px;padding:12px;font-size:15px;font-family:inherit;resize:none;min-height:80px;outline:none}
+.issue-submit{width:100%;margin-top:8px;padding:12px;background:var(--navy);color:var(--white);border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+
+/* ── PAST ROUTES SCREEN ── */
+.past-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+16px)}
+.past-route-card{background:var(--white);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.past-route-date{font-size:15px;font-weight:600;color:var(--text)}
+.past-route-meta{font-size:12px;color:var(--gray4);margin-top:2px}
+.past-route-stops{margin-top:8px;display:none}
+.past-route-stops.open{display:block}
+.past-stop-row{font-size:13px;color:var(--gray5);padding:4px 0;border-bottom:1px solid var(--gray1);display:flex;justify-content:space-between}
+.past-stop-row:last-child{border-bottom:none}
+.past-stop-time{font-size:11px;color:var(--green);font-weight:500}
+
+/* ── SHEET MODAL ── */
+.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+.sheet-backdrop.open{display:flex}
+.sheet{background:var(--white);border-radius:20px 20px 0 0;padding:16px 20px calc(var(--safe-bot)+20px);width:100%;max-height:80vh;overflow-y:auto}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--gray3);margin:0 auto 16px}
+.sheet-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.sheet-field{margin-bottom:12px}
+.sheet-label{font-size:12px;color:var(--gray4);font-weight:500;margin-bottom:4px}
+.sheet-input{width:100%;padding:12px;border:1px solid var(--gray2);border-radius:10px;font-size:15px;font-family:inherit;outline:none}
+.sheet-input:focus{border-color:var(--navy)}
+.sheet-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--navy);color:var(--white);font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
+.sheet-btn-green{background:var(--green)}
+.sheet-btn-red{background:var(--red)}
+
+/* ── UTILS ── */
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
+.tag-green{background:var(--green-lt);color:var(--green)}
+.tag-orange{background:var(--orange-lt);color:var(--orange)}
+.tag-navy{background:#EEF2FF;color:var(--navy)}
+.divider{height:1px;background:var(--gray1);margin:8px 0}
+.empty-state{text-align:center;padding:40px 20px;color:var(--gray3)}
+.empty-state-icon{font-size:48px;margin-bottom:12px}
+.empty-state-text{font-size:15px}
+
+/* Drag reorder */
+.dragging{opacity:.5;transform:scale(1.02)}
+
+/* Custom trip screen */
+.trip-stop-item{display:flex;align-items:center;gap:10px;background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.trip-stop-num{width:24px;height:24px;border-radius:50%;background:var(--green);color:var(--white);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.trip-stop-name{font-size:14px;font-weight:600;flex:1}
+.trip-stop-addr{font-size:11px;color:var(--gray4);margin-top:1px}
+.trip-add-section{background:var(--white);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.trip-add-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+.trip-node-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+.trip-node-chip{flex:0 0 auto;padding:7px 12px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--white);font-size:12px;font-weight:500;cursor:pointer;color:var(--gray5);font-family:inherit;white-space:nowrap}
+.trip-node-chip:active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.trip-node-chip.selected{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.trip-manual-row{display:flex;gap:6px}
+.trip-manual-input{flex:1;padding:9px 12px;border:1px solid var(--gray2);border-radius:10px;font-size:13px;font-family:inherit;outline:none;background:var(--gray0)}
+.trip-manual-input:focus{border-color:var(--navy);background:var(--white)}
+.trip-start-btn{width:100%;padding:15px;border-radius:14px;border:none;background:var(--green);color:var(--white);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+.trip-start-btn:disabled{background:var(--gray3);cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN — bypassed, auto-navigates to home on load -->
+<div class="screen" id="pin-screen" style="display:none"></div>
+
+<!-- ══════════════════════════════════════════════════════════
+     HOME SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen active" id="home-screen">
+  <div class="home-map-wrap">
+    <div id="home-map"></div>
+  </div>
+  <div class="home-bottom">
+    <!-- Unified white callout card: Start a Delivery + HQ + Warehouse -->
+    <div style="background:var(--white);border-radius:18px;box-shadow:0 6px 28px rgba(0,0,0,.25);overflow:hidden;margin-bottom:0">
+
+      <!-- Start a Delivery row -->
+      <button onclick="goTo('custom-trip-screen')" style="width:100%;background:transparent;border:none;padding:15px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;font-family:inherit">
+        <div style="width:34px;height:34px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:16px;flex-shrink:0">🔍</div>
+        <div style="font-size:16px;font-weight:700;color:var(--text);flex:1;text-align:left">Start a Delivery</div>
+        <div style="font-size:20px;color:var(--gray3);font-weight:300">›</div>
+      </button>
+
+      <!-- Horizontal green divider -->
+      <div style="height:1px;background:#659D1B;margin:0 14px"></div>
+
+      <!-- HQ + Warehouse side by side -->
+      <div style="display:flex">
+        <button onclick="navigateTo('3448 Holly Springs Pkwy, Canton, GA 30115')" style="flex:1;background:transparent;border:none;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:14px;flex-shrink:0">🏠</div>
+          <div style="text-align:left;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap">Alma Coffee HQ</div>
+            <div style="font-size:10px;color:var(--gray4);margin-top:1px">Holly Springs Pkwy</div>
+          </div>
+        </button>
+        <!-- Vertical green divider -->
+        <div style="width:1px;background:#659D1B;margin:10px 0"></div>
+        <button onclick="navigateTo('145 P Rickman Industrial Dr, Canton, GA 30115')" style="flex:1;background:transparent;border:none;padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:14px;flex-shrink:0">🏭</div>
+          <div style="text-align:left;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap">Warehouse</div>
+            <div style="font-size:10px;color:var(--gray4);margin-top:1px">P Rickman Dr</div>
+          </div>
+        </button>
+      </div>
+    </div>
+    <div class="home-grid">
+      <button class="home-tile" onclick="goTo('today-screen')">
+        <div class="home-tile-icon">📅</div>
+        <div class="home-tile-label">Today</div>
+        <div class="home-tile-badge" id="today-badge">0 stops</div>
+      </button>
+      <button class="home-tile" onclick="goTo('week-screen')">
+        <div class="home-tile-icon">🗓</div>
+        <div class="home-tile-label">This Week</div>
+      </button>
+      <button class="home-tile" onclick="goTo('past-screen')">
+        <div class="home-tile-icon">📋</div>
+        <div class="home-tile-label">Previous</div>
+      </button>
+      <button class="home-tile" onclick="goTo('routes-screen')">
+        <div class="home-tile-icon">🗺</div>
+        <div class="home-tile-label">Routes</div>
+      </button>
+      <button class="home-tile" onclick="goTo('contacts-screen')">
+        <div class="home-tile-icon">📞</div>
+        <div class="home-tile-label">Contacts</div>
+      </button>
+      <button class="home-tile" onclick="goTo('issues-screen')">
+        <div class="home-tile-icon">⚠️</div>
+        <div class="home-tile-label">Issues</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TODAY SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="today-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Today's Deliveries</div>
+    <div class="topbar-right" id="today-date"></div>
+  </div>
+  <div class="today-map-peek"><div id="today-map"></div></div>
+  <div class="today-content">
+    <div class="today-header">
+      <div>
+        <div class="today-title">Stops</div>
+        <div class="today-meta" id="today-progress-label">0 of 0 delivered</div>
+      </div>
+      <button class="stop-btn btn-navigate" onclick="addStopSheet()" style="width:auto;padding:8px 14px;font-size:13px">+ Add stop</button>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div id="stop-list"></div>
+    <div class="empty-state" id="stop-empty" style="display:none">
+      <div class="empty-state-icon">📦</div>
+      <div class="empty-state-text">No stops scheduled today.<br>Admin will push your route.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     THIS WEEK SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="week-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">This Week</div>
+  </div>
+  <div class="week-content">
+    <div class="week-days" id="week-day-tabs"></div>
+    <div class="week-section-title" id="week-day-label">Monday</div>
+    <div id="week-stop-list"></div>
+    <button class="week-add-btn" onclick="addWeekStopSheet()">+ Add stop to this day</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ROUTES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="routes-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Delivery Routes</div>
+  </div>
+  <div class="routes-content" id="routes-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONTACTS SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="contacts-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Contacts</div>
+    <button class="topbar-back" onclick="addContactSheet()" style="font-size:22px;background:none">+</button>
+  </div>
+  <div class="contacts-search">
+    <input type="text" placeholder="Search contacts…" id="contact-search" oninput="renderContacts()">
+  </div>
+  <div class="contacts-list" id="contacts-list"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ISSUES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="issues-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Issues Log</div>
+  </div>
+  <div class="issues-content" id="issues-list"></div>
+  <button class="issue-fab" onclick="toggleIssueInput()">+</button>
+  <div class="issue-input-wrap" id="issue-input-wrap">
+    <textarea class="issue-textarea" id="issue-textarea" placeholder="Describe the issue…" rows="3"></textarea>
+    <button class="issue-submit" onclick="submitIssue()">Log Issue</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAST ROUTES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="past-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Past Routes</div>
+  </div>
+  <div class="past-content" id="past-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CUSTOM TRIP SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="custom-trip-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Start a Delivery</div>
+    <button onclick="clearTrip()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;font-family:inherit">Clear</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+90px)">
+
+    <!-- Planned stops -->
+    <div style="font-size:12px;font-weight:600;color:var(--gray4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your stops</div>
+    <div id="custom-trip-stops">
+      <div class="empty-state" style="padding:20px">
+        <div class="empty-state-icon" style="font-size:32px">📦</div>
+        <div class="empty-state-text" style="font-size:13px">Add stops below to build your route</div>
+      </div>
+    </div>
+
+    <!-- Add from existing nodes -->
+    <div class="trip-add-section">
+      <div class="trip-add-title">Add existing customer</div>
+      <div class="trip-node-scroll" id="trip-node-chips"></div>
+      <button class="trip-node-chip" onclick="addTripNode()" style="width:100%;border-radius:10px;padding:9px;text-align:center;background:var(--green-lt);border-color:var(--green);color:var(--green)">+ Add selected customer</button>
+    </div>
+
+    <!-- Add manual stop -->
+    <div class="trip-add-section">
+      <div class="trip-add-title">Add new location</div>
+      <div class="trip-manual-row" style="margin-bottom:6px">
+        <input class="trip-manual-input" id="trip-manual-name" placeholder="Business name"/>
+      </div>
+      <div class="trip-manual-row" style="margin-bottom:6px">
+        <input class="trip-manual-input" id="trip-manual-addr" placeholder="Street address"/>
+        <input class="trip-manual-input" id="trip-manual-city" placeholder="City" style="max-width:120px"/>
+      </div>
+      <div class="trip-manual-row">
+        <input class="trip-manual-input" id="trip-manual-order" placeholder="Order # (optional)" style="max-width:140px"/>
+        <input class="trip-manual-input" id="trip-manual-note" placeholder="Note (optional)"/>
+      </div>
+      <button onclick="addTripManual()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--navy);color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Add to route</button>
+    </div>
+
+    <button class="trip-start-btn" id="trip-start-btn" onclick="startCustomTrip()" disabled>Start Route</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     BOTTOM NAV (shown on all main screens except pin)
+══════════════════════════════════════════════════════════ -->
+<div class="bottom-nav" id="bottom-nav">
+  <button class="nav-item active" onclick="goTo('home-screen')" id="nav-home">
+    <div class="nav-icon">🏠</div><div class="nav-label">Home</div>
+  </button>
+  <button class="nav-item" onclick="goTo('today-screen')" id="nav-today">
+    <div class="nav-icon">📅</div><div class="nav-label">Today</div>
+  </button>
+  <button class="nav-item" onclick="goTo('week-screen')" id="nav-week">
+    <div class="nav-icon">🗓</div><div class="nav-label">Week</div>
+  </button>
+  <button class="nav-item" onclick="goTo('issues-screen')" id="nav-issues">
+    <div class="nav-icon">⚠️</div><div class="nav-label">Issues</div>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SHEET MODALS
+══════════════════════════════════════════════════════════ -->
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
+  <div class="sheet" id="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+================================================================================
+  ALMA COFFEE DRIVER APP
+  PWA for iPhone | Supabase backend shared with admin planning tool
+  
+  SUPABASE: https://dclvscfotnhhknhbgzhm.supabase.co
+  Tables used: driver_routes, driver_stops, driver_contacts, driver_issues,
+               nodes (read-only for stop data), named_routes (read-only)
+  
+  PIN: Default is 1234. Admin sets driver PIN in Supabase driver_config table.
+  
+  TO INSTALL ON iPHONE: Open in Safari → Share → "Add to Home Screen"
+================================================================================
+*/
+
+const SUPA_URL = 'https://dclvscfotnhhknhbgzhm.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjbHZzY2ZvdG5oaGtuaGJnemhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDM4NzIsImV4cCI6MjEwMTUxOTg3Mn0.DMfpDUdRWUnddTp7KWLcSyJoeLymVVNTRd2zCbZbTVE';
+const DRIVER_PIN = '1234'; // Change this — admin sets in Supabase
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentScreen = 'home-screen';
+let screenHistory = [];
+let pinEntry = '';
+let todayStops = [];   // {id, name, address, orderNum, instructions, stopNote, status, arrivedAt, deliveredAt, lat, lng}
+let weekData = {};     // {date: [stops]}
+let contacts = [];     // {id, name, role, business, phone}
+let issues = [];       // {id, text, timestamp}
+let namedRoutes = [];  // from Supabase named_routes
+let selectedWeekDay = null;
+let homeMap = null, todayMap = null;
+let driverLat = null, driverLng = null;
+let watchId = null;
+let driverMarker = null;
+
+const ROASTERY = {lat: 34.23607, lng: -84.49079};
+
+// ── Supabase helpers ───────────────────────────────────────────────────────
+async function sbGet(table, filter='') {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*${filter}&order=id.asc`, {
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    });
+    if (!r.ok) return [];
+    return r.json();
+  } catch(e) { return []; }
+}
+
+async function sbUpsert(table, row) {
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'},
+      body: JSON.stringify(row)
+    });
+  } catch(e) { console.warn('Save failed', e); }
+}
+
+async function sbDelete(table, id) {
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    });
+  } catch(e) {}
+}
+
+// ── PIN AUTH — disabled, auto-login on load ─────────────────────────────
+function pinTap(){}
+function updatePinDots(){}
+async function checkPin(){}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────
+function goTo(screenId) {
+  if (screenId === currentScreen) return;
+  screenHistory.push(currentScreen);
+  document.getElementById(currentScreen).classList.remove('active');
+  document.getElementById(screenId).classList.add('active');
+  currentScreen = screenId;
+  const showNav = screenId !== 'pin-screen';
+  document.getElementById('bottom-nav').style.display = showNav ? 'flex' : 'none';
+  // Nav highlight
+  ['home-screen','today-screen','week-screen','issues-screen'].forEach((s, i) => {
+    const navIds = ['nav-home','nav-today','nav-week','nav-issues'];
+    document.getElementById(navIds[i]).classList.toggle('active', s === screenId);
+  });
+  // Init maps lazily
+  if (screenId === 'home-screen' && !homeMap) initHomeMap();
+  if (screenId === 'today-screen' && !todayMap) initTodayMap();
+  if (screenId === 'today-screen') renderStopList();
+  if (screenId === 'week-screen') renderWeek();
+  if (screenId === 'routes-screen') renderRoutes();
+  if (screenId === 'contacts-screen') renderContacts();
+  if (screenId === 'custom-trip-screen') initCustomTrip();
+  if (screenId === 'issues-screen') renderIssues();
+  if (screenId === 'past-screen') renderPast();
+}
+
+function goBack() {
+  if (screenHistory.length > 0) {
+    const prev = screenHistory.pop();
+    document.getElementById(currentScreen).classList.remove('active');
+    document.getElementById(prev).classList.add('active');
+    currentScreen = prev;
+  }
+}
+
+// ── APP INIT ───────────────────────────────────────────────────────────────
+async function initApp() {
+  startGPS();
+  await loadAll();
+  renderHome();
+}
+
+async function loadAll() {
+  // Load today's stops from Supabase driver_routes pushed for today
+  const today = new Date().toISOString().slice(0, 10);
+  const pushed = await sbGet('driver_routes', `&date=eq.${today}&order=stop_order.asc`);
+  if (pushed && pushed.length) {
+    todayStops = pushed.map(r => ({
+      id: r.id, name: r.stop_name, address: r.stop_address,
+      orderNum: r.order_num || '', instructions: r.instructions || '',
+      stopNote: r.stop_note || '', status: r.status || 'pending',
+      arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
+      lat: r.lat, lng: r.lng
+    }));
+  }
+
+  // Load week data
+  const allWeek = await sbGet('driver_routes', `&order=date.asc,stop_order.asc`);
+  weekData = {};
+  if (allWeek) allWeek.forEach(r => {
+    if (!weekData[r.date]) weekData[r.date] = [];
+    weekData[r.date].push(r);
+  });
+
+  // Load named routes from admin tool
+  namedRoutes = await sbGet('named_routes') || [];
+
+  // Load contacts
+  contacts = await sbGet('driver_contacts') || [];
+
+  // Load issues
+  issues = await sbGet('driver_issues', '&order=created_at.desc') || [];
+
+  // Cache nodes globally for custom trip builder
+  try {
+    const allNodes = await sbGet('nodes');
+    if (allNodes && allNodes.length) {
+      window.ALL_NODES = allNodes.map(n => ({
+        id: n.id, name: n.name, address: n.address, lat: n.lat, lng: n.lng
+      }));
+    }
+  } catch(e) {}
+  // Update today badge
+  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) return;
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      driverLat = pos.coords.latitude;
+      driverLng = pos.coords.longitude;
+      updateDriverMarker();
+    },
+    err => console.log('GPS error:', err),
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 5000}
+  );
+}
+
+function updateDriverMarker() {
+  if (!driverLat || !driverLng) return;
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:#0033A0;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8]
+  });
+  [homeMap, todayMap].forEach(m => {
+    if (!m) return;
+    if (!driverMarker) driverMarker = L.marker([driverLat, driverLng], {icon}).addTo(m);
+    else driverMarker.setLatLng([driverLat, driverLng]);
+  });
+}
+
+// ── HOME ───────────────────────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById('today-badge').textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
+
+function initHomeMap() {
+  homeMap = L.map('home-map', {zoomControl: false, attributionControl: false})
+    .setView([ROASTERY.lat, ROASTERY.lng], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(homeMap);
+  L.circleMarker([ROASTERY.lat, ROASTERY.lng], {
+    radius: 8, fillColor: '#0033A0', fillOpacity: 1, color: '#fff', weight: 2
+  }).addTo(homeMap).bindPopup('Alma Coffee HQ');
+  todayStops.forEach(s => {
+    if (s.lat && s.lng) L.circleMarker([s.lat, s.lng], {
+      radius: 6, fillColor: '#2E7D32', fillOpacity: .9, color: '#fff', weight: 1.5
+    }).addTo(homeMap);
+  });
+}
+
+// ── TODAY / STOPS ──────────────────────────────────────────────────────────
+function initTodayMap() {
+  todayMap = L.map('today-map', {zoomControl: false, attributionControl: false})
+    .setView([ROASTERY.lat, ROASTERY.lng], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(todayMap);
+  // Draw route line
+  if (todayStops.length) {
+    const pts = [[ROASTERY.lat, ROASTERY.lng],
+      ...todayStops.filter(s => s.lat && s.lng).map(s => [s.lat, s.lng]),
+      [ROASTERY.lat, ROASTERY.lng]];
+    L.polyline(pts, {color: '#0033A0', weight: 2.5, opacity: .7}).addTo(todayMap);
+    todayStops.forEach((s, i) => {
+      if (!s.lat || !s.lng) return;
+      const color = s.status === 'delivered' ? '#2E7D32' : s.status === 'arrived' ? '#C9A84C' : '#0033A0';
+      L.circleMarker([s.lat, s.lng], {
+        radius: 9, fillColor: color, fillOpacity: 1, color: '#fff', weight: 2
+      }).addTo(todayMap).bindPopup(`${i+1}. ${s.name}`);
+    });
+    if (pts.length > 1) todayMap.fitBounds(L.latLngBounds(pts), {padding: [20, 20]});
+  }
+}
+
+function renderStopList() {
+  const el = document.getElementById('stop-list');
+  const empty = document.getElementById('stop-empty');
+  const delivered = todayStops.filter(s => s.status === 'delivered').length;
+  const total = todayStops.length;
+
+  document.getElementById('today-progress-label').textContent = `${delivered} of ${total} delivered`;
+  document.getElementById('progress-fill').style.width = total ? `${(delivered/total)*100}%` : '0%';
+
+  if (!total) { el.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  el.innerHTML = todayStops.map((s, i) => {
+    const isActive = s.status === 'pending' && (i === 0 || todayStops[i-1]?.status === 'delivered');
+    const isDelivered = s.status === 'delivered';
+    const isArrived = s.status === 'arrived';
+    const numClass = isDelivered ? 'delivered-num' : isActive || isArrived ? 'active-num' : '';
+    const cardClass = isActive || isArrived ? 'active' : isDelivered ? 'delivered' : '';
+
+    return `<div class="stop-card ${cardClass}" id="stop-${i}">
+      <div class="stop-card-inner">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="stop-num ${numClass}">${isDelivered ? '✓' : i+1}</span>
+          <div style="flex:1;min-width:0">
+            <div class="stop-name">${s.name}</div>
+            <div class="stop-addr">${s.address}</div>
+            ${s.orderNum ? `<div class="stop-order">Order: ${s.orderNum}</div>` : ''}
+            ${s.stopNote ? `<div class="stop-note">📝 ${s.stopNote}</div>` : ''}
+          </div>
+        </div>
+        ${isArrived && s.instructions ? `
+        <div class="instructions-panel">
+          <div class="instructions-label">Delivery Instructions</div>
+          ${s.instructions}
+        </div>` : ''}
+        ${isDelivered ? `
+        <div class="stop-delivered-row">
+          ✓ Delivered at ${s.deliveredAt ? new Date(s.deliveredAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'confirmed'}
+        </div>` : `
+        <div class="stop-actions">
+          ${!isArrived ? `<button class="stop-btn btn-arrived" onclick="markArrived(${i})">I'm Here</button>` : ''}
+          ${isArrived ? `<button class="stop-btn btn-delivered" onclick="markDelivered(${i})">Delivered ✓</button>` : ''}
+          <button class="stop-btn btn-navigate" onclick="navigateTo('${encodeURIComponent(s.address)}')">Navigate</button>
+        </div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function markArrived(idx) {
+  const s = todayStops[idx];
+  s.status = 'arrived';
+  s.arrivedAt = new Date().toISOString();
+  // Log GPS
+  if (driverLat && driverLng) {
+    s.arrivedLat = driverLat; s.arrivedLng = driverLng;
+  }
+  await sbUpsert('driver_routes', {
+    id: s.id, status: 'arrived', arrived_at: s.arrivedAt,
+    arrived_lat: s.arrivedLat || null, arrived_lng: s.arrivedLng || null
+  });
+  // Show instructions if they exist
+  if (s.instructions) {
+    // Instructions appear inline in the card — re-render shows them
+  }
+  renderStopList();
+}
+
+async function markDelivered(idx) {
+  const s = todayStops[idx];
+  s.status = 'delivered';
+  s.deliveredAt = new Date().toISOString();
+  if (driverLat && driverLng) {
+    s.deliveredLat = driverLat; s.deliveredLng = driverLng;
+  }
+  await sbUpsert('driver_routes', {
+    id: s.id, status: 'delivered', delivered_at: s.deliveredAt,
+    delivered_lat: s.deliveredLat || null, delivered_lng: s.deliveredLng || null
+  });
+  renderStopList();
+  // Auto-scroll to next stop
+  const nextIdx = todayStops.findIndex((s2, i) => i > idx && s2.status === 'pending');
+  if (nextIdx >= 0) {
+    setTimeout(() => {
+      const el = document.getElementById(`stop-${nextIdx}`);
+      if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }, 300);
+  }
+}
+
+function navigateTo(encodedAddr) {
+  const addr = decodeURIComponent(encodedAddr);
+  // Opens Apple Maps with the address
+  window.open(`http://maps.apple.com/?daddr=${encodeURIComponent(addr)}&dirflg=d`, '_blank');
+}
+
+// ── THIS WEEK ──────────────────────────────────────────────────────────────
+function renderWeek() {
+  const today = new Date();
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - today.getDay() + i);
+    days.push(d);
+  }
+
+  const tabEl = document.getElementById('week-day-tabs');
+  tabEl.innerHTML = days.map(d => {
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString('en', {weekday: 'short'}) + ' ' + d.getDate();
+    const hasStops = weekData[key] && weekData[key].length > 0;
+    const isToday = key === today.toISOString().slice(0, 10);
+    const isSelected = key === selectedWeekDay;
+    return `<button class="week-day-btn${hasStops?' has-stops':''}${isSelected?' active':''}" onclick="selectWeekDay('${key}')">${label}${isToday?' ·':''}</button>`;
+  }).join('');
+
+  if (!selectedWeekDay) selectWeekDay(today.toISOString().slice(0, 10));
+  else renderWeekStops();
+}
+
+function selectWeekDay(dateKey) {
+  selectedWeekDay = dateKey;
+  const d = new Date(dateKey + 'T12:00:00');
+  document.getElementById('week-day-label').textContent =
+    d.toLocaleDateString('en', {weekday: 'long', month: 'long', day: 'numeric'});
+  renderWeek();
+  renderWeekStops();
+}
+
+function renderWeekStops() {
+  const el = document.getElementById('week-stop-list');
+  const stops = weekData[selectedWeekDay] || [];
+  if (!stops.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No deliveries scheduled</div></div>`;
+    return;
+  }
+  el.innerHTML = stops.map((s, i) => `
+    <div class="week-stop-item" draggable="true" data-idx="${i}">
+      <div class="week-stop-drag">⠿</div>
+      <div class="week-stop-info">
+        <div class="week-stop-name">${s.stop_name || s.name}</div>
+        ${(s.order_num || s.orderNum) ? `<div class="week-stop-order">Order: ${s.order_num || s.orderNum}</div>` : ''}
+      </div>
+      <span class="tag tag-navy">#${i+1}</span>
+    </div>
+  `).join('');
+}
+
+// ── ROUTES ─────────────────────────────────────────────────────────────────
+function renderRoutes() {
+  const el = document.getElementById('routes-content');
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const COLORS = ['#1E88E5','#43A047','#FB8C00','#E53935','#8E24AA','#00ACC1','#F4511E'];
+  if (!namedRoutes.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗺</div><div class="empty-state-text">No routes set up yet.<br>Admin creates routes in the planning tool.</div></div>`;
+    return;
+  }
+  el.innerHTML = namedRoutes.map((rt, idx) => {
+    const color = rt.color || COLORS[idx % COLORS.length];
+    const nodeIds = rt.node_ids ? (typeof rt.node_ids === 'string' ? JSON.parse(rt.node_ids) : rt.node_ids) : [];
+    return `<div class="route-zone-card">
+      <div class="route-zone-hdr" onclick="toggleRouteZone('rz-${rt.id}')">
+        <div class="route-zone-color" style="background:${color}"></div>
+        <div class="route-zone-name">${rt.name}</div>
+        <div class="route-zone-meta">${DAYS[rt.day] || ''} · ${nodeIds.length} stops</div>
+      </div>
+      <div class="route-zone-stops" id="rz-${rt.id}">
+        ${nodeIds.map((nid, i) => `<div class="route-stop-row"><span style="color:${color};font-weight:600">${i+1}</span><span>Stop ${nid}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleRouteZone(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── CONTACTS ───────────────────────────────────────────────────────────────
+function renderContacts() {
+  const q = document.getElementById('contact-search')?.value.toLowerCase() || '';
+  const el = document.getElementById('contacts-list');
+  const filtered = contacts.filter(c =>
+    c.name?.toLowerCase().includes(q) ||
+    c.business?.toLowerCase().includes(q) ||
+    c.role?.toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📞</div><div class="empty-state-text">No contacts yet.<br>Tap + to add one.</div></div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(c => `
+    <div class="contact-row">
+      <div class="contact-avatar">${(c.name||'?')[0].toUpperCase()}</div>
+      <div class="contact-info">
+        <div class="contact-name">${c.name || '—'}</div>
+        ${c.role ? `<div class="contact-role">${c.role}</div>` : ''}
+        ${c.business ? `<div class="contact-biz">${c.business}</div>` : ''}
+      </div>
+      ${c.phone ? `<a href="tel:${c.phone}" class="contact-call">📞</a>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── ISSUES ─────────────────────────────────────────────────────────────────
+function renderIssues() {
+  const el = document.getElementById('issues-list');
+  if (!issues.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No issues logged yet.</div></div>`;
+    return;
+  }
+  el.innerHTML = issues.map(issue => `
+    <div class="issue-card">
+      <div class="issue-time">${new Date(issue.created_at || issue.timestamp).toLocaleString('en', {dateStyle:'medium',timeStyle:'short'})}</div>
+      <div class="issue-text">${issue.text || issue.note}</div>
+    </div>
+  `).join('');
+}
+
+function toggleIssueInput() {
+  const el = document.getElementById('issue-input-wrap');
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) document.getElementById('issue-textarea').focus();
+}
+
+async function submitIssue() {
+  const text = document.getElementById('issue-textarea').value.trim();
+  if (!text) return;
+  const issue = {
+    id: 'iss-' + Date.now(),
+    text,
+    note: text,
+    created_at: new Date().toISOString(),
+    timestamp: new Date().toISOString()
+  };
+  issues.unshift(issue);
+  await sbUpsert('driver_issues', {id: issue.id, note: text, created_at: issue.created_at});
+  document.getElementById('issue-textarea').value = '';
+  document.getElementById('issue-input-wrap').classList.remove('open');
+  renderIssues();
+}
+
+// ── PAST ROUTES ─────────────────────────────────────────────────────────────
+function renderPast() {
+  const el = document.getElementById('past-content');
+  // Group delivered stops by date
+  const allRoutes = Object.entries(weekData).sort((a, b) => b[0].localeCompare(a[0]));
+  if (!allRoutes.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No past routes yet.</div></div>`;
+    return;
+  }
+  el.innerHTML = allRoutes.map(([date, stops]) => {
+    const delivered = stops.filter(s => s.status === 'delivered').length;
+    const d = new Date(date + 'T12:00:00');
+    const label = d.toLocaleDateString('en', {weekday:'long',month:'long',day:'numeric'});
+    return `<div class="past-route-card" onclick="togglePast('past-${date}')">
+      <div class="past-route-date">${label}</div>
+      <div class="past-route-meta">${stops.length} stops · ${delivered} delivered</div>
+      <div class="past-route-stops" id="past-${date}">
+        ${stops.map(s => `
+        <div class="past-stop-row">
+          <span>${s.stop_name || s.name}</span>
+          ${s.status === 'delivered' ? `<span class="past-stop-time">✓ ${s.delivered_at ? new Date(s.delivered_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'delivered'}</span>` : '<span style="color:var(--gray3)">—</span>'}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePast(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── SHEETS (modal bottom sheets) ────────────────────────────────────────────
+function openSheet(content) {
+  document.getElementById('sheet-content').innerHTML = content;
+  document.getElementById('sheet-backdrop').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('sheet-backdrop').classList.remove('open');
+}
+
+function addStopSheet() {
+  openSheet(`
+    <div class="sheet-title">Add a Stop</div>
+    <div class="sheet-field"><div class="sheet-label">Business name</div>
+      <input class="sheet-input" id="sh-name" placeholder="e.g. Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Address</div>
+      <input class="sheet-input" id="sh-addr" placeholder="Street, City, GA"/></div>
+    <div class="sheet-field"><div class="sheet-label">Order number</div>
+      <input class="sheet-input" id="sh-order" placeholder="#129010 (optional)"/></div>
+    <div class="sheet-field"><div class="sheet-label">Delivery note</div>
+      <input class="sheet-input" id="sh-note" placeholder="e.g. call ahead (optional)"/></div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveAddStop()">Add to Today's Route</button>
+  `);
+}
+
+async function saveAddStop() {
+  const name = document.getElementById('sh-name').value.trim();
+  const addr = document.getElementById('sh-addr').value.trim();
+  if (!name || !addr) return;
+  const stop = {
+    id: 'stop-' + Date.now(),
+    stop_name: name, name,
+    stop_address: addr, address: addr,
+    order_num: document.getElementById('sh-order').value.trim(),
+    stop_note: document.getElementById('sh-note').value.trim(),
+    status: 'pending',
+    date: new Date().toISOString().slice(0, 10),
+    stop_order: todayStops.length + 1,
+    lat: null, lng: null, instructions: ''
+  };
+  todayStops.push(stop);
+  await sbUpsert('driver_routes', stop);
+  closeSheet();
+  renderStopList();
+  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length!==1?'s':''}`;
+}
+
+function addWeekStopSheet() {
+  openSheet(`
+    <div class="sheet-title">Add Stop to ${document.getElementById('week-day-label').textContent}</div>
+    <div class="sheet-field"><div class="sheet-label">Business name</div>
+      <input class="sheet-input" id="wsh-name" placeholder="e.g. Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Order number</div>
+      <input class="sheet-input" id="wsh-order" placeholder="#129010 (optional)"/></div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveWeekStop()">Add</button>
+  `);
+}
+
+async function saveWeekStop() {
+  const name = document.getElementById('wsh-name').value.trim();
+  if (!name || !selectedWeekDay) return;
+  if (!weekData[selectedWeekDay]) weekData[selectedWeekDay] = [];
+  const stop = {
+    id: 'wstop-' + Date.now(),
+    stop_name: name,
+    order_num: document.getElementById('wsh-order').value.trim(),
+    date: selectedWeekDay,
+    stop_order: weekData[selectedWeekDay].length + 1,
+    status: 'pending'
+  };
+  weekData[selectedWeekDay].push(stop);
+  await sbUpsert('driver_routes', stop);
+  closeSheet();
+  renderWeek();
+  renderWeekStops();
+}
+
+function addContactSheet() {
+  openSheet(`
+    <div class="sheet-title">Add Contact</div>
+    <div class="sheet-field"><div class="sheet-label">Name *</div>
+      <input class="sheet-input" id="csh-name" placeholder="Marcus Johnson"/></div>
+    <div class="sheet-field"><div class="sheet-label">Business</div>
+      <input class="sheet-input" id="csh-biz" placeholder="Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Role / Title</div>
+      <input class="sheet-input" id="csh-role" placeholder="Manager (optional)"/></div>
+    <div class="sheet-field"><div class="sheet-label">Phone number *</div>
+      <input class="sheet-input" id="csh-phone" type="tel" placeholder="(678) 555-1234"/></div>
+    <button class="sheet-btn" onclick="saveContact()">Save Contact</button>
+  `);
+}
+
+async function saveContact() {
+  const name = document.getElementById('csh-name').value.trim();
+  const phone = document.getElementById('csh-phone').value.trim();
+  if (!name) return;
+  const c = {
+    id: 'con-' + Date.now(),
+    name,
+    business: document.getElementById('csh-biz').value.trim(),
+    role: document.getElementById('csh-role').value.trim(),
+    phone
+  };
+  contacts.push(c);
+  await sbUpsert('driver_contacts', c);
+  closeSheet();
+  renderContacts();
+}
+
+// ── CUSTOM TRIP ──────────────────────────────────────────────────────────────
+// Stores stops the driver builds from scratch for an ad-hoc delivery run
+let customTripStops = [];
+let selectedTripNodeId = null;
+
+function initCustomTrip() {
+  // Populate node chips from NODES data loaded from Supabase
+  const chipEl = document.getElementById('trip-node-chips');
+  // Use the namedRoutes nodes or a flat node list if available
+  // For now pull from a globally available node list
+  if (window.ALL_NODES && window.ALL_NODES.length) {
+    chipEl.innerHTML = window.ALL_NODES.map(n =>
+      `<button class="trip-node-chip" id="chip-${n.id}" onclick="selectTripNode(${n.id},'${n.name.replace(/'/g,"\'")}','${(n.address||'').replace(/'/g,"\'")}')">
+        ${n.name.split(' ')[0]}
+      </button>`
+    ).join('');
+  } else {
+    chipEl.innerHTML = '<div style="font-size:12px;color:var(--gray4)">No customers loaded yet</div>';
+  }
+  renderCustomTripStops();
+}
+
+function selectTripNode(id, name, addr) {
+  selectedTripNodeId = {id, name, addr};
+  document.querySelectorAll('.trip-node-chip').forEach(c => c.classList.remove('selected'));
+  const chip = document.getElementById('chip-' + id);
+  if (chip) chip.classList.add('selected');
+}
+
+function addTripNode() {
+  if (!selectedTripNodeId) return;
+  customTripStops.push({
+    id: 'ct-' + Date.now(),
+    name: selectedTripNodeId.name,
+    address: selectedTripNodeId.addr,
+    orderNum: '',
+    stopNote: ''
+  });
+  selectedTripNodeId = null;
+  document.querySelectorAll('.trip-node-chip').forEach(c => c.classList.remove('selected'));
+  renderCustomTripStops();
+}
+
+function addTripManual() {
+  const name = document.getElementById('trip-manual-name').value.trim();
+  const addr = document.getElementById('trip-manual-addr').value.trim();
+  const city = document.getElementById('trip-manual-city').value.trim();
+  if (!name) return;
+  customTripStops.push({
+    id: 'ct-' + Date.now(),
+    name,
+    address: [addr, city, 'GA'].filter(Boolean).join(', '),
+    orderNum: document.getElementById('trip-manual-order').value.trim(),
+    stopNote: document.getElementById('trip-manual-note').value.trim()
+  });
+  ['trip-manual-name','trip-manual-addr','trip-manual-city','trip-manual-order','trip-manual-note']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  renderCustomTripStops();
+}
+
+function removeTripStop(idx) {
+  customTripStops.splice(idx, 1);
+  renderCustomTripStops();
+}
+
+function renderCustomTripStops() {
+  const el = document.getElementById('custom-trip-stops');
+  const btn = document.getElementById('trip-start-btn');
+  btn.disabled = customTripStops.length === 0;
+  if (!customTripStops.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:20px">
+      <div class="empty-state-icon" style="font-size:32px">📦</div>
+      <div class="empty-state-text" style="font-size:13px">Add stops below to build your route</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = customTripStops.map((s, i) => `
+    <div class="trip-stop-item">
+      <div class="trip-stop-num">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div class="trip-stop-name">${s.name}</div>
+        <div class="trip-stop-addr">${s.address || '—'}</div>
+        ${s.orderNum ? `<div style="font-size:11px;color:var(--navy);margin-top:2px">Order: ${s.orderNum}</div>` : ''}
+      </div>
+      <button onclick="removeTripStop(${i})" style="background:var(--red-lt);color:var(--red);border:none;border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit">✕</button>
+    </div>
+  `).join('');
+}
+
+function clearTrip() {
+  customTripStops = [];
+  renderCustomTripStops();
+}
+
+async function startCustomTrip() {
+  if (!customTripStops.length) return;
+  // Push these stops to todayStops and navigate to Today screen
+  const today = new Date().toISOString().slice(0, 10);
+  const newStops = customTripStops.map((s, i) => ({
+    id: s.id,
+    stop_name: s.name, name: s.name,
+    stop_address: s.address, address: s.address,
+    order_num: s.orderNum, orderNum: s.orderNum,
+    stop_note: s.stopNote, stopNote: s.stopNote,
+    status: 'pending',
+    date: today,
+    stop_order: todayStops.length + i + 1,
+    instructions: '',
+    lat: null, lng: null
+  }));
+  // Save to Supabase
+  await Promise.all(newStops.map(s => sbUpsert('driver_routes', s)));
+  // Add to today's live list
+  newStops.forEach(s => todayStops.push(s));
+  document.getElementById('today-badge').textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+  customTripStops = [];
+  goTo('today-screen');
+  renderStopList();
+}
+
+// ── DATE display ────────────────────────────────────────────────────────────
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('en', {month:'short', day:'numeric'});
+
+// ── AUTO-START — no PIN, go straight to home ──────────────────────────────
+(async function() {
+  // Show home screen and nav immediately
+  document.getElementById('pin-screen').style.display = 'none';
+  document.getElementById('home-screen').classList.add('active');
+  document.getElementById('bottom-nav').style.display = 'flex';
+  currentScreen = 'home-screen';
+  // Set nav active state
+  document.getElementById('nav-home').classList.add('active');
+  // Init map and load data
+  initHomeMap();
+  startGPS();
+  await loadAll();
+  renderHome();
+})();
+
+</script>
+</body>
+</html>  link.rel = 'manifest'; link.href = manifestURL;
+  document.head.appendChild(link);
+});
+</script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+/* ============================================================
+   ALMA COFFEE DRIVER APP
+   PWA for iPhone — driver-facing delivery management
+   Colors: Navy #0033A0, Gold #C9A84C, Green #2E7D32 (actions)
+   ============================================================ */
+:root{
   --navy:#0033A0; --navy-dk:#002280; --navy-lt:#1a4db3;
   --gold:#C9A84C; --gold-lt:#F5EDDA;
   --green:#2E7D32; --green-lt:#E8F5E9; --green-bright:#4CAF50;
