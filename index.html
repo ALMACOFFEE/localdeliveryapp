@@ -1297,4 +1297,1267 @@ document.getElementById('today-date').textContent =
 
 </script>
 </body>
+</html>  link.rel = 'manifest'; link.href = manifestURL;
+  document.head.appendChild(link);
+});
+</script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+/* ============================================================
+   ALMA COFFEE DRIVER APP
+   PWA for iPhone — driver-facing delivery management
+   Colors: Navy #0033A0, Gold #C9A84C, Green #2E7D32 (actions)
+   ============================================================ */
+:root{
+  --navy:#0033A0; --navy-dk:#002280; --navy-lt:#1a4db3;
+  --gold:#C9A84C; --gold-lt:#F5EDDA;
+  --green:#2E7D32; --green-lt:#E8F5E9; --green-bright:#4CAF50;
+  --red:#C0392B; --red-lt:#FFEBEE;
+  --orange:#E65100; --orange-lt:#FFF3E0;
+  --gray0:#F8F8F8; --gray1:#F0F0F0; --gray2:#E0E0E0;
+  --gray3:#BDBDBD; --gray4:#888; --gray5:#555;
+  --text:#1a1a1a; --white:#FFFFFF;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bot: env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--navy);color:var(--text);user-select:none}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:none;flex-direction:column;background:var(--gray0)}
+.screen.active{display:flex}
+
+/* ── PIN SCREEN ── */
+#pin-screen{background:var(--navy);align-items:center;justify-content:center;gap:0}
+.pin-logo{margin-bottom:32px;text-align:center}
+.pin-logo img{width:180px}
+.pin-title{color:var(--white);font-size:17px;font-weight:500;margin-bottom:8px;opacity:.8}
+.pin-subtitle{color:var(--white);font-size:13px;opacity:.5;margin-bottom:36px}
+.pin-dots{display:flex;gap:14px;margin-bottom:32px}
+.pin-dot{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:transparent;transition:background .15s}
+.pin-dot.filled{background:var(--white);border-color:var(--white)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,80px);gap:12px}
+.pin-btn{width:80px;height:80px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--white);font-size:28px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;transition:background .1s;font-family:inherit}
+.pin-btn:active{background:rgba(255,255,255,.2)}
+.pin-btn-sub{font-size:9px;letter-spacing:.08em;opacity:.5;font-weight:500}
+.pin-error{color:#FF6B6B;font-size:13px;margin-top:12px;min-height:18px}
+
+/* ── TOP BAR ── */
+.topbar{background:var(--navy);color:var(--white);padding:calc(var(--safe-top) + 12px) 16px 12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:var(--white);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.topbar-title{font-size:17px;font-weight:600;flex:1}
+.topbar-right{font-size:13px;opacity:.7}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);padding:8px 0 calc(var(--safe-bot) + 8px);display:flex;flex-shrink:0;z-index:100}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;border:none;background:none;color:var(--gray4);font-family:inherit}
+.nav-item.active{color:var(--navy)}
+.nav-icon{font-size:22px;line-height:1}
+.nav-label{font-size:10px;font-weight:500;letter-spacing:.02em}
+
+/* ── HOME SCREEN ── */
+#home-screen{background:var(--navy)}
+.home-map-wrap{flex:0 0 45%;position:relative;overflow:hidden}
+#home-map{width:100%;height:100%}
+.home-bottom{flex:1;background:var(--white);border-radius:20px 20px 0 0;margin-top:-20px;padding:20px 16px calc(var(--safe-bot) + 90px);overflow-y:auto}
+.home-start-bar{background:var(--white);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.1);padding:14px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.home-search-icon{width:36px;height:36px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:16px;flex-shrink:0}
+.home-start-label{font-size:16px;font-weight:600;color:var(--text);flex:1}
+.home-origin{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--gray0);border-radius:10px;margin-bottom:16px}
+.home-origin-icon{width:32px;height:32px;border-radius:8px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:14px}
+.home-origin-label{font-size:13px;font-weight:500;color:var(--text)}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.home-tile{background:var(--navy);border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:background .15s;border:none;font-family:inherit;color:var(--white)}
+.home-tile:active{background:var(--navy-dk)}
+.home-tile-icon{font-size:28px}
+.home-tile-label{font-size:13px;font-weight:600;letter-spacing:.01em}
+.home-tile-badge{background:var(--green-bright);color:var(--white);border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600}
+
+/* ── TODAY SCREEN ── */
+.today-map-peek{flex:0 0 120px;position:relative;overflow:hidden}
+#today-map{width:100%;height:100%}
+.today-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot) + 90px)}
+.today-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.today-title{font-size:22px;font-weight:700;color:var(--text)}
+.today-meta{font-size:13px;color:var(--gray4)}
+.progress-bar{background:var(--gray2);border-radius:4px;height:6px;margin-bottom:16px;overflow:hidden}
+.progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
+.stop-card{background:var(--white);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;overflow:hidden;border:2px solid transparent;transition:border-color .2s}
+.stop-card.active{border-color:var(--green)}
+.stop-card.delivered{opacity:.55}
+.stop-card-inner{padding:14px 14px 12px}
+.stop-num{width:26px;height:26px;border-radius:50%;background:var(--navy);color:var(--white);font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;flex-shrink:0}
+.stop-num.delivered-num{background:var(--green)}
+.stop-num.active-num{background:var(--green)}
+.stop-name{font-size:15px;font-weight:600;color:var(--text)}
+.stop-addr{font-size:12px;color:var(--gray4);margin-top:2px;line-height:1.4}
+.stop-order{font-size:11px;color:var(--navy);font-weight:500;margin-top:4px}
+.stop-note{font-size:11px;color:var(--orange);font-weight:500;margin-top:3px}
+.stop-actions{display:flex;gap:8px;margin-top:10px}
+.stop-btn{flex:1;padding:10px;border-radius:10px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-arrived{background:var(--navy);color:var(--white)}
+.btn-arrived:active{background:var(--navy-dk)}
+.btn-delivered{background:var(--green);color:var(--white)}
+.btn-delivered:active{background:var(--green-lt);color:var(--green)}
+.btn-navigate{background:var(--gray1);color:var(--navy);flex:0 0 auto;padding:10px 14px}
+.stop-delivered-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--green);font-weight:500}
+
+/* Arrival instructions panel */
+.instructions-panel{background:var(--gold-lt,#FFF8E7);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:10px 12px;margin:8px 0;font-size:12px;color:var(--gray5);line-height:1.5}
+.instructions-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--gold);margin-bottom:4px}
+
+/* ── THIS WEEK SCREEN ── */
+.week-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+90px)}
+.week-days{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.week-day-btn{flex:0 0 auto;padding:8px 14px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--white);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--gray4)}
+.week-day-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.week-day-btn.has-stops{border-color:var(--green);color:var(--green)}
+.week-day-btn.active.has-stops{background:var(--green);border-color:var(--green);color:var(--white)}
+.week-section-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:12px}
+.week-stop-item{background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.week-stop-drag{color:var(--gray3);font-size:18px;cursor:grab;padding:0 4px}
+.week-stop-info{flex:1;min-width:0}
+.week-stop-name{font-size:14px;font-weight:600;color:var(--text)}
+.week-stop-order{font-size:11px;color:var(--navy);margin-top:2px}
+.week-add-btn{width:100%;padding:14px;border-radius:12px;border:2px dashed var(--gray3);background:transparent;color:var(--gray4);font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:4px}
+.week-add-btn:active{background:var(--gray1)}
+.push-route-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--green);color:var(--white);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:12px}
+.push-route-btn:active{background:var(--green-lt);color:var(--green)}
+
+/* ── ROUTES SCREEN ── */
+.routes-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+16px)}
+.route-zone-card{background:var(--white);border-radius:14px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.route-zone-hdr{padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.route-zone-hdr:active{background:var(--gray0)}
+.route-zone-color{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.route-zone-name{font-size:15px;font-weight:600;flex:1}
+.route-zone-meta{font-size:12px;color:var(--gray4)}
+.route-zone-stops{padding:0 16px 12px;display:none}
+.route-zone-stops.open{display:block}
+.route-stop-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray1);font-size:13px;color:var(--gray5)}
+.route-stop-row:last-child{border-bottom:none}
+
+/* ── CONTACTS SCREEN ── */
+.contacts-search{padding:12px 16px;background:var(--white);border-bottom:1px solid var(--gray2)}
+.contacts-search input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--gray2);background:var(--gray0);font-size:15px;font-family:inherit;outline:none}
+.contacts-list{flex:1;overflow-y:auto;padding-bottom:calc(var(--safe-bot)+16px)}
+.contact-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--gray1);background:var(--white)}
+.contact-avatar{width:40px;height:40px;border-radius:50%;background:var(--navy);color:var(--white);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;flex-shrink:0}
+.contact-info{flex:1;min-width:0}
+.contact-name{font-size:15px;font-weight:500;color:var(--text)}
+.contact-role{font-size:12px;color:var(--gray4);margin-top:1px}
+.contact-biz{font-size:12px;color:var(--navy);margin-top:1px}
+.contact-call{width:40px;height:40px;border-radius:50%;background:var(--green-lt);border:none;color:var(--green);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;text-decoration:none}
+
+/* ── ISSUES SCREEN ── */
+.issues-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+80px)}
+.issue-card{background:var(--white);border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.issue-time{font-size:11px;color:var(--gray3);margin-bottom:4px}
+.issue-text{font-size:14px;color:var(--text);line-height:1.5}
+.issue-fab{position:fixed;bottom:calc(var(--safe-bot) + 90px);right:20px;width:56px;height:56px;border-radius:50%;background:var(--navy);color:var(--white);border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 12px rgba(0,51,160,.4);display:flex;align-items:center;justify-content:center;z-index:50}
+.issue-input-wrap{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--gray2);padding:12px 16px calc(var(--safe-bot)+16px);display:none;z-index:200}
+.issue-input-wrap.open{display:block}
+.issue-textarea{width:100%;border:1px solid var(--gray2);border-radius:10px;padding:12px;font-size:15px;font-family:inherit;resize:none;min-height:80px;outline:none}
+.issue-submit{width:100%;margin-top:8px;padding:12px;background:var(--navy);color:var(--white);border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+
+/* ── PAST ROUTES SCREEN ── */
+.past-content{flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+16px)}
+.past-route-card{background:var(--white);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.past-route-date{font-size:15px;font-weight:600;color:var(--text)}
+.past-route-meta{font-size:12px;color:var(--gray4);margin-top:2px}
+.past-route-stops{margin-top:8px;display:none}
+.past-route-stops.open{display:block}
+.past-stop-row{font-size:13px;color:var(--gray5);padding:4px 0;border-bottom:1px solid var(--gray1);display:flex;justify-content:space-between}
+.past-stop-row:last-child{border-bottom:none}
+.past-stop-time{font-size:11px;color:var(--green);font-weight:500}
+
+/* ── SHEET MODAL ── */
+.sheet-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:flex-end}
+.sheet-backdrop.open{display:flex}
+.sheet{background:var(--white);border-radius:20px 20px 0 0;padding:16px 20px calc(var(--safe-bot)+20px);width:100%;max-height:80vh;overflow-y:auto}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--gray3);margin:0 auto 16px}
+.sheet-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.sheet-field{margin-bottom:12px}
+.sheet-label{font-size:12px;color:var(--gray4);font-weight:500;margin-bottom:4px}
+.sheet-input{width:100%;padding:12px;border:1px solid var(--gray2);border-radius:10px;font-size:15px;font-family:inherit;outline:none}
+.sheet-input:focus{border-color:var(--navy)}
+.sheet-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--navy);color:var(--white);font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px}
+.sheet-btn-green{background:var(--green)}
+.sheet-btn-red{background:var(--red)}
+
+/* ── UTILS ── */
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
+.tag-green{background:var(--green-lt);color:var(--green)}
+.tag-orange{background:var(--orange-lt);color:var(--orange)}
+.tag-navy{background:#EEF2FF;color:var(--navy)}
+.divider{height:1px;background:var(--gray1);margin:8px 0}
+.empty-state{text-align:center;padding:40px 20px;color:var(--gray3)}
+.empty-state-icon{font-size:48px;margin-bottom:12px}
+.empty-state-text{font-size:15px}
+
+/* Drag reorder */
+.dragging{opacity:.5;transform:scale(1.02)}
+
+/* Custom trip screen */
+.trip-stop-item{display:flex;align-items:center;gap:10px;background:var(--white);border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.trip-stop-num{width:24px;height:24px;border-radius:50%;background:var(--green);color:var(--white);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.trip-stop-name{font-size:14px;font-weight:600;flex:1}
+.trip-stop-addr{font-size:11px;color:var(--gray4);margin-top:1px}
+.trip-add-section{background:var(--white);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.trip-add-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+.trip-node-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+.trip-node-chip{flex:0 0 auto;padding:7px 12px;border-radius:20px;border:1.5px solid var(--gray2);background:var(--white);font-size:12px;font-weight:500;cursor:pointer;color:var(--gray5);font-family:inherit;white-space:nowrap}
+.trip-node-chip:active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.trip-node-chip.selected{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.trip-manual-row{display:flex;gap:6px}
+.trip-manual-input{flex:1;padding:9px 12px;border:1px solid var(--gray2);border-radius:10px;font-size:13px;font-family:inherit;outline:none;background:var(--gray0)}
+.trip-manual-input:focus{border-color:var(--navy);background:var(--white)}
+.trip-start-btn{width:100%;padding:15px;border-radius:14px;border:none;background:var(--green);color:var(--white);font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px}
+.trip-start-btn:disabled{background:var(--gray3);cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     PIN SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen active" id="pin-screen">
+  <div class="pin-logo">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAhKElEQVR4nO2deXwcxZn3n6eqe2Y0o5HGsixZlmXrsGxh4wMbG9v4UEgCZjch5PgkEJJN3hCSkGyuXbK7OSCB8LIkAZKXZUkCJIQcS14SckHCEeL4BOPb2GDZlg/ZlmTZukdzdnc9+8eo7JE0R7csYWjq+/noI1tdXU8dv66ueqq6CmHRzwgUCpfALnQCFIqxRAla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4SqUoBWuQgla4Sq0842AMRQAAEIQAwCYMsnfsXph+eFl8yaZ8+tLiivL/BNKirxFnCMHAIjGzdiZnnjfsbaBnq2vdkbX7+woee1I71RLEEcEIgIcbgMRKJEUnmjc9GdKQ6Ffi+gaMzLdmykuIYD1R5JBO+HzURTQw5yjlS3dRIAFXh6/dHZpy+qF5bF59ROCVeWB0KQJvpCuMR0AoDecDLe0D3RufbWz57mX2oIbdnXMSSQtLwAAZ2hZgrj8DQDg8/D4FYsr9l61bEp06dxJpdMmByb5fVoBAEAsYcbP9CT6WtoHera91hlZv6MjtGXvmYZ40vLJ+AQRc5J3v0+Lej0smSuPnKE1uzZ0cvXC8u4lc0r91VMKJ0ya4CuW6bIssrr7E/2tp6M9ew519730yhlt/c6OurYz0XKAkToaLXg+5xSmF3Ljosm7P3ltfeSqZZUXlYa8JU7iae+MdQhBhDiywEyLLI0jf/y5o023/GD7ao2jaVqkAaQKQQhiv7pz5YuNiybXWYIszlIPTiaIgBABT3XFelbd9GxVJGYGsj1Edtn4yNWv1FYWlgsCwXDkG48IyOvhHidlsre559DPnmpue/j3hxaFo0ahzHOBl8dueu/MrTe9d2blxXWhGXbjazrWd+TJtS3Hf/rH5rojreEqgHNll+s+afeeL126/vqrahpkXWTKI2OIFaUF5XbTBADQ2Zvofn5La9PDvz/kX7fj1AKAoZoaDaNuoaXhmdOKjn3nC4s6rm2cdpm8JgQJAiAEQEQcIRYiIgAAAiDOkNspiNKQ71C2a5MnFhRMmeS3XZgenesjUzU6ppb5S+zYJgISRCJXmcjymDtjQv29X15c/5n3zzr2hXu2Nj37Yuuly+ZN2vfwN5b75tSGVueLb3j5NlQX1379E/Nqv3jd7Mh9v3p13V2P7l2WSFpeu+IpDfm43fK1BFkIqQYiVz4RAEtD3pIPr6ld/uE1tfCHdcdf/vf7d5QfPN5ffT6iHpWgpcH3XTF9y09uXX5RKOipliJmiIwxzPnkj6wAyPqWMC1hapxphimyhkkawiICyt9CEyEiJpJWEgC8udJol4RhGVJcDLPnGxGQY/a0pZeJECQEgaifVlT9zP3vqP7+/7y2/sb31C8sCuhB0yKTITDGkGWLb3j5yvgK/VrgtpvmN165dMq+67++IXSsbWCqnZbaMAURAcm6yJnHHOU/PG3pD+W1jdMua1w0ue/Gb7+45XdrW5aOVtSO+yvS0A1X125+8ruNS0NBT7FpkckYMs6QZ+o25AMRMPsPyn/nuB9z3J8xrjFqn9NsQ27bTuJkDJnGUROCBADAlz88e3VRQA8KQULjqOVrMLLFRwRkmMJYOnfSxesfWsPqpxUdE4KY7L9mz6Oso9zl7CRNg/EiZ8gZQ2ZaZIaCnuInv9u49IarazfLcYPTOB0VjBTz6oXle35++4plQpCQhezUsCI/jCGTb57Bfur5DZgQUNeYblpkTpscmPLHe68QoaCnb/DaBT3zXT7AQpD4+e0rlq1eWL5nNKJ2VEAEgEG/PvDY7StKGUNGcP6FrMiNbMXG8q2icdQMUxgX1RTX3vvlS/cKQYxh7lb69SBdU4/dvqI06NcHCBy+3ZwEFoLY569r2D69orDStMjM118aS8ayQscSOQB7s6FrTLcEWZ+4pn7Fkjmlr+ZqDV/PsucMuWmROb2isPLz1zVsd+rGcxS4KKCHb/5AwywioEwuqvGkszfhuD81nsh+Z0dXvB8g5VG4sClyjhyMf+WfLg7nCvd6lz1DYERAN3+gYVZRQM+ZthH3Ogm8Znnlvqll/gqA1OvB7n2WIMu0yDQtMuVAx3YCEZgQJJ7Z3FoMADAWkyFjAUMQAADPvtTaA5DbU5OJ9DKxBJ2XYEZbvvINe/XyyrmTJxaclpNb8ros62c2txYLQRn97LkQgsRo8ii1NbXMX7FmeeU+JzYdJfCaVVVCulrs3kOU8oVqHDU5QndS6NLNE44aY+JmG2t6+pOO31TDy4Qz5E4f9GxxOSlfREBLkBUo0AIrFpQdAUgN/IeHk2Wfya+cDSFISO+KzKOTh14QCSKga1ZVOSoXR96JhQ0TKxABGeRvnWXiEQF/t7Zly/Nb2oxQ0CM+ee3M6hlVwely1i5fPJYgS+OoLZ5dembH/q6LLvRoXCJbr+XzJzkaR8iKfvbF1u1/XH8iyjnCdVfWhFYsKJtnt0zS0kCIgE9vPLnt6Y0n4l4PF9dfVTNx6dxJF9uNiwiICGhhw8T4b//WMuSaLOvFs0vPMIYXmRaZdjxa0iPTfCLc8sgfDh7rDSfZlUun6O+7YvrSdF3kioMhMkTAhQ0TK/LZS8eRoKvKA+V2EgOQesI4Q/7NH+9ed8fDexrl3x/+/aGeF354ZdOCmSWzZOXasV1bWfiGELJEjr6nTS4sBLBXJnLi58HfHNjwue9sWSX//uBvmuiJuxu3fODt05fmmxwaHtd9v3pt/b9+f9tq+ff/fqLJ+t09b9t6zaqqJXbjQgSsmxr0AmTu0jkpeyFIICLuOtDd9I6bny/v7k+sBgD48e8Owm03zV93+6cXNFqCrFyTTDJNAOc0ZxdHr8tCvxawE06IlJibT4Rb7nh4TyNjKHSNGV4PT3T3JyZ848FdYURAJwOpkmLvG8o9KEffpSFvAAAA87iXZNegP2KEb/vRrosRgTw6S3r01KKf//ivHVOShkgyTPme7cTV1Zfo/taPdy+ScXk9PGEJ4l97YGeJJciyE5cUTijo8QCce1DTcVL2BKk3wzce3BXu7k9M8Hp4QteYwRiKOx7e09h8ItzipItlV3OScRGJFOorh7rbAQAQgAxT6IYpdESgfYd7zrr9nA6m3mh4tOxTwelI996xtoH2nnAyBACQXibHT0Uq2s5ETyMC5nMFyjHM4ZPh9nDUKAQASBrCkzQsDyJQy6mBijM98S6H3ZfzRj5opkXmvsM9lYhp9T5ME+PlFXrdWz0iQKJUK/562x4P7NaKrMBYwjJk6y5f70SAQhCLp9aY2LdNI2f4ZJxCXDj/uBAkiC6MR+oN9Rp/K5B7TYpzAbxR3JhvFJSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKpSgFa5CCVrhKsb19CpERM7Q4jy1iTZjKBCAOL/wB9QoxhfOUXCGVlqdWwDONk0fDeMq6KQhhCWIywMU5e/ecDI4nnYVF57ecDKYqe6ThhjXxmxcBC1PVL18QVn143etepEhoiAiBEQCIr9P0zSOlwK8cU+3UjhH1qXGUXvs9hUHonHTlHUuNXD5grIagHMaGWvGRdAyY1PL/BXXXVnj6EgBxZsfxpBds6pqSa4w49WQjWuXQ56CmtrEO7Wzu/z9ep5xqHj9kaffDq/7sT5EdDjjPCgEVMcmvzW5UA2WctspXIUStMJVKEErXIUStMJVKEErXIVy2ynGBeW2U7iKC9VgjYvY5BN58nS0fdPujqOZpr7ftWLqpXbP+Va8uRCCxNObTm7PNPW9YkF5zdQyf4XUyFjbHhdBCyLBEfnm3aePXf+1DcuHXw8FPX0dz3/I9DD0jFfG8qFxZmocTUQkIsppXxAwefqrIjuyLk2LzI99c9Os3nCyeHiYX9+1+qUPXVldITUy1mkY1+6AR2dMLh+1LOKMoRCCWCjoCQNAwXjazoUgEOcK+0191PgbllDQEw5HjEJZ51IDHp2Na8MwzoNCovTlgwSpM60t68K0dvJNUFyoB2//9IJ1CcMCBATKImohADw6g027Txev3dZ+iayc1zXRb1Isi1h6nQMMaoDG9wzyt+SALejXC2+7aX6j3fAPPNG0Ye22dmAIQihX5xuat6SgAQBMi8z8YYSpcaZFYqbql7xJeMsK2p47kYHGUWPqE4Q3Der1qXAVStAKV6EErXAVStAKV6EErXAVjrwcQpCtPRWEIIEAKHI4uwSREIIEARBS9qlvIUgIBJHLHS+ISIhUfAhjN41+1na+MIKEIBC5Qp4tkxw5EQJozOIisF2+qbrKHhdRWj4RsmpA2hKUXSciLS4HdWW74XUkaLuLiWS4Ai/POFePCODzcJ+duDwMPQAAXk/2KdMCL9cYQzbWi52kbY+WPdpAgeZjDBnLU+gybX6f5hm7uHj2uHxagZ3ySKurrFrwehhjDJksj3z4PNyXbX+kAi/n41FXEkeC3nOw+6CdcJYg4dG5dqClPwoAQMOexKQhtO2vde3XNeQEQLmeVBnX4ZNhAwCAMrQ2+4/29U8s9h4yLbIYjl03Sto+fioC2WzvOtB9sjecjOSzLQiExpHvbe45AwAzh18nANx1oPtE34CTuHozxiUE4I6mriNlE3yFqVWOOVrowbj2H+3rH5GmwfwePhk29h3ubU4alslzCFHWpWGSlTTExOH5AwA40NIfnV6RP65hjMhjNhAW/UzNgilcgxoUKlyFErTCVShBK1yFErTCVShBK1zFmC8fRQRCRMLBb5sIAIkIM7m83si2EM//2yw76RgLO3ZsjZUdO7bG2qaT+hwTQTOGgiEI0yKNKCWq4WE4Sx1JIIjY+QhO2kp9zpPZFgCAxtE8n49bx+MBfCvYudA2z0vQiEAMUViCuPw0qaK0oKOi1N9TFNDjgghPd8eDJ09HygeiZkDexxla8lvD87FVVuLrrCj1d4cK9RgAQH/E8LZ3xkpOdcXKTIs0acvpQ6RxNCcW+3qcpE9CQMgQRcKwPD39yVC+8IECLVIU0AcsQRwBHbVo0lZ/xCiMxk1/PjtBvx4RRMypHae2JCVF3h6PzozR2pR0dMcm2Q07akFLUVpEfE5tqPn6NTUn1yyrLJ85vagq6NfLZTgioBMdkfbtr3Xu/e3fWsTv/358YTxp+RhLbdVhR2jy41SLiM+cVnTs+jU1x65aWll6UU1xVSjoGTKL1B8xwgda+l577qW207965si0pmN9telx2LEzuzZ0ZMPDayaPplwsQZauMd/m3aebrv7CC5ciAmXKo8bRNC3Sbv7ArO233TR/UdIQSaeb8pgWmR6d+b7x4K5t9/96/2oZZyY7//zBhu1fv3HeqOyk5+uzd2/Z9cu/HLk8V6Mk8/yHe992Yv7MkhrLIoux0Y/XQo2P2w47KkHLzEyZ5O/49s0LDn30H+ou0zU2Iz0MDX5KjQg4bXJgyrTJgSnvu2I6vHak9/C3H3ml49fPH10+eD1jhQ+3NWmCr+uOzyx49ePvnrHE5+HV2WwVBfTg4tmlsxfPLp39lY/OSTz6VPOGW3+46+LO3kSJ3TcDZyiKCz1FoyiasxQV6l474com+CDo1wvPx5aeY62JpMCr0fnaAQAwzdx7mEgQgUqKvf6igP66HhDlWNBSFCsWlL3y+F2rJ00t868ASLUWDIEhIqZvHEMERKlv1wkAYHZtqO7xu1bVvXNpxaYv3rP1kmjcKgCgjP0taWv5vLK9v7xzZahmSuGqXLbS7QkC4fVw72feP2vVOy+bcvxDX13fsWN/10V2RM05koxn+DFk6XnJhGWRpXHUTNPeykTOGRAByQ9y06/lWrUGAGCawtQ1pnf3J/I+pKYlRm0H4Fy+RJ5NeWQDpWvM8GhMIwISRCL9kKB8ZZjOYGNlW6dOV9sJSxBfeUn5K8/c/466QIEWMC0yNY6afI1Zgiyg1N5mcrNGhsDkXmdCkDAtMj9xTf0Kj8Y3f/S2janXFw0VmbS1fF7Z3uceeGdtoT9lizPk0pYQJCwBZxfyyH/LFWvSft3U4LQXHryyb+Unn2ned7h3Rrbuh/SWBHxaMn2TwSFh8pyzdzafg8sx7ezMhAiY6eHMt7MQ96RWM3KWv39a6NdxtHYGbXAAAI0z231haQsJhth0clZhPGnFYbwEDZAa9P32O41TAgVawBKpp1ZeE4JE+iZ96Zs1WoKs1M6TiLqGem842fejJw8UIQINX43HWOpgzorSgo4nv9dYLsWcbkvGl77UUv5bCBKMIZP2TYvMUNBT/JvvNHYt/qenI9G4VZCvq5ONrr5EdyxhJRimHpjh1y1BQtcYb2mPDACce0icIgSJju74mVxrnqWtgaiZV5AF3sxBLEFWR1esM1NehqSHUnXb05+wtYQ0NT7KnPZo3Ix29yf7spUhwLmVewMxIwYANXZsAjhf4M/u/vyi5rIS3+WGKQxdY3raNcEYsvU7O/Y89nRzeG9zz8QCr2asWFDW/bF31U2fNb24xhKUOk0UAD9y68aDm/ecXpyptUQAsgTxuz+/qHnyxIKMtjhD/uqR3uafPdXcuutAdxERwIKZE/pvfE/91Nm1oTqZHoDUlgWGKYyG6uLaWz5y8bpvPbS7MdNbIa0wRyAfoE/935cOPr+lda7GmWlZ2QdFhikWDd6XU2zFhfqQvMu3Qntn7PTCjzylxeKWL9fDhwgUS1iLAQCGDwiHxTv8/4QI2Nkb777khqd4PjvSViRmXmInXxpnpqaxIWFko/Tk2pZdn717y4JcZXg2nUCO+uCOBD13xoRD119Vs0QIEun9MCmeW3+4a92dP3mlMf2ejbs64P89vj9652cvWf/lD89eDQDw6bte2vjnTSdXZhqVy67GnNpQ84fX1F6WzdaPnjyw4Uv3brsskbTODkbXbmuHH/72QOyn37z8xeuurFmeLmrOkAtB4uYPzLr4B4+/1tcbThZnq0BdY1n7lJGYoae7IM8XjbMRfXRExFjCSpzujo/K05KJXDtwhSNGIJawxnSvQa+HJwu83AswsovR3Zc0B6JmYDTu23w4EvTH3z2jTddYvewXA5xruX72VPOmO3/ySiNnaCECCQKGAIQIFI2b/n+5b9tqwxTrNc7god8dzOhiAoCz221dv6bmpMZxhmmRqTEY0m35y+aT227+zy2rEIF0jRmyhWcMRSxhFXz01o1LZteEDs6dMaH+bNeEIbMEWWUlvtK3L67Y8uTalqWcoZUpDQGflvqYIK2xlovkk4bgjKXOsc5VGXZdktmENthdMmU5Du+WpWNn8qjQr2cMY5hkjrWYJdm6E3InKjtidto1dCTodyypqAA4V7lEQAyRxRJW7FsP7amRfd/hIpFT1P9+/47VACnhZXs9ykw2Lpo8cfDeIbYMUxi3/GD7RDnRYphCT79X15hhmEL/z0f3dj5+16qZ6UWa8lwALZs3KfHk2pas+cxUC7KVicZNXQgas+11s42PUh6J7F0Ip2T7hC1U6Cl66vtv3ybyjVwB4Ev3bqs40hqusuPTH+xDD/mbHF996Mrq2tm1xS9rnLFM/WxBQAwBm0+GY/9y37bVeZI1BEcFNqMqOBXg3HdocqCws6mruaV9YK5smYffJ6eo5dx+tsKQT2OhX4tUVxROAjh3JrS0tetA98H9R/vmyK7J8DgsQRwRaOPujtpo3Iz6fZpf9hflT93UoE+mK1M6MtWtfLB+fsfKwEDUaMp0nxBAjAGe6Ij2vfeWtUsoNbrP2MLIvxUFdD3977Jsq8r9k3f88l0Z7QzmU3CG7PHnjnbc84tXV+d/Y2TOT6FfC7xr5dTF2e5L545H9uw/0monJICuMcOj8yF5kzbrpgan1U0NTssXx479XfvtWTuHI0H7fdqQKU/5SjnWNtB/dmo6y0BrMHwe91XKxVUU8AwUF3oyDgaaT/T3IcLZBUkjbaRe9QNR098bToaHpxkAoLjQk3PSw+fhVrZrM6cVVee6FwBg8sSCjnxhJCzLxnleD/cubJjYkO/+F7a2dwDkXwiUy4shB+vZ7pMuzKQhbPd3vR5u+Dw840SO/LI920b3lkUW58g7exNRu/Yk57uWAwEAfF7OiSDvPvyy0M9n0QpnDO3Y0jiaPm/mr6IHokYyV/oCBVrWnUnl1gDZrjGGrG/AiOROnT1yCc00halpTOsfMPIJWbbEGsDIQ+PzuevOhSMaiJq2+9pElJouy4KdUxsYc64TR4KOxMxIoEA7O8KXfen59SUVnKGVa+Bit98FANA3kCzsG0iGC/0jbc2pC03K5Ls+awdREALOqAq2lxR556RPjsg+dMupSBwge6uW23WFmPUrapbqIg3EjHiu7sbQ+HKUGWb/KpoxZAiAnNurc4+WuQ+NCGh3YoWx7HtyDCfVzcxcvvm2MJB97UCBpucKlwlHgj54vP/Egpkls4iI5N4KQpCYURWcvmZ55bY/bzq52KOzpGEKXVYoIpJcWjqhyNMbjVsFiaTlzVTZ8p5IzAwcbRs4XFnmnyzP4pC25tSG6lZeUv7Khp0d8+UAcEhhcLSShvB88tqZ3QCpVk5OyMg+9PbXOvM8WNmv5RKgFIZXz77HxVkbgw9F4WClZYo3ly3pl+c29/odniX5NjnQ0nf0i/ds7c56H6X2USECaD0dnZ36W/71HLrGTI/OhtSN9Dg9+qfmTf//r0cLGCJlmkqXNjt7E7ZW9aXjSNAvvNzWccmskgZBQ59UIqD7v7Jk8s6mro72zlg5wLkBHhGhAGDz6icc/M13Gj17Dnbv/+B/rF/GEIWAkcs6pSvtb1vbu1csKBvxSkQEvP+WJQWX3/hMJBIzAxrHs90DQcCShvC887IpOz/+7hnLUj7slJillyQaN6MvbG2fIcNnyqffx4W8R/6W4vo/t2/edPhkuIgzFJkqgyFSf8TIOegcmp+hbg4ptJ1NXU1fundbMpsdIkCNozjSOlAPYM8FNuT+QY33DRjR515qW2TnHsZQ5HvTynGQR2emV+dDxiqyPLfsO0N2bWZz72YNbzcgAMBjTx+u/MJ1FyV0jemykhlDRgRUWxmsWv/QmmO3/GD71ue3tM2TS0Trq4paPv7uupYvXj/7sgIvL5g5raj6gX+Lb/jn7768KtNsnRTZ/zx7pPprn5hryDUh0pYQJObPLJn5/H+/c+/n7n7Zs/tg96z0+2+4unbzD7+6dP7wc/JkS/2bF1p2tp6OrsjlFfD7tIyv1kTSSjyzuXWWk/W5+RjutpJC6+pLRDfu6lhoP57MD4+glPgKs7y+E0kraz99RFwOXJWDjdmIxV0AAIYpbPeNnbouHQV+9UjvjF8+c2Tjje+pX5m+tgIRUAgS9dOKqv943xXVR9sGTrSejvaEgh5/Q3VxtcaxBuDc6PZzH2xY1dmbWPeth3Y3Dn/ihSDGGVoHj/dX//RPzRs//b6ZK9OnvqWol88rm7vtF+8yX3i5bfvug90DgQKNrVhQXnbJrJLLAYa2qqnWGVgkZkbueHjP9Fx9cIDsiy8IgAIFWpwztHK1VOkH5eSD88x9W11LnSCWr0W0+/GCNsyOHAdMLPYGbnxP/UbGMOdsohCAuoa0fmdHZdOxvtp86coUl5yMe/viCmSIGzlHEDl3DkzxyB8OrcwbaBDHq+2++sDO2WuWVZ6qLPNPThe1FBoAQM2UwqqaKYVV8r7UzGKqz40EGE9a8W9+an7j0bbwpseePjyitRRELGVrx9y3L65omVEVnJ5J1BpHbc3yykvXLK88m0YhSKSvKJMPkcZR+/z3Xt51pDWcs3UGyD1NLIhw+OlOo0HeG/RrqenhYQ9YJGYa6SeIjdaOZHiO5MBsdm2o7pFbl9fZjefL921b33SsrzbfAUp+n5aQrbOsC2nzhqtrL7/h6lrbaX/kD4dsh3VcIWd64hPf/29/7+qPGGG56Ef2jdIHipYgSwgSNHi+M8A5N5TPw31/fblt54adHdNZqo84fIEOAgD09CdD1/7rWqO9M9aha0w3LTLlQyO7OpYgy7TIlNfkKrvBmTaTMWQaR+22H+1e9+ifmvOKGQDA79OyeT/o9TrWLe6gK2CHbE24LKd8P4mklTAtMjt743JMkvOt4PNyI9ugVuojve5y/TjJp6PKkd2Bl/d1znnbp59rbTrWd0TXmC67HGe3SUVEhshwcIQgD7BP9YeJvvvzfev/4QsvzDvaNlCVbc2DtPXqkd4Zqz/1bGzL3jP7NI5aupCJiBgi4wx5+nrrVBpSS0f7BpL9n7hj86ZvP7Kn0e5iGJ+HQ3p+5Na/8YSVkL5YOyN9O1hp2/Gm2xyLuAHOCc/v0zyygUm3kypDYHl/GDKGwBJJYUszQtAQTQzPG6YcGZjPrtMzw0fzbRnnDK2dTV0Nl33sz+FbPjpn3Y3vqb9oyiR/eabw8rUTiZmRpzeefOV7v9gX2rG/a3XqWm4/rSVSp88eOt5fvfKTz5ifef+sDZ/7YMPUhuri2ky+0/QBSHd/oueJvx7b+72fv1pjp5uRjq4xyLR9bKFfCyBC2E4cdkAEChV6/Olb6MrXss+TeSvi0RIM2NuqNxsyXR49+0rEdDhHuhBnuY9qplAKrT9iBG/70e7GB55o6vzHFVM3Xbl0Cru4bkJZeYlvgkdneldfoq/5RPj037efCv9x/fFp+4/2LQNw9iW2EKn+tGmR9sATTasefao5smZZ5Zarlk0xFjZMLJ08sWBCMKAH4gkrcbon3rv/aO+Zv21tN/+yubXuREdklbRnR8wyPfsO93qefbF1e8IQFmfIBv3uGImZZtIQc0dTZunIB5khinU7Tp04dKL/jGWlPAKWIOHVGV+341TGrYhHy3MvtR0/fDLcaVqpg+Sd3i+ISNcYO34qErSTrkjM9P5l88ltMl9O7ckyH4iaJgAss3uf2k5X4SrUVmAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAVStAKV6EErXAV/wtEI2/GfIoJXgAAAABJRU5ErkJggg==" alt="Alma Coffee" style="border-radius:22px;width:280px">
+  </div>
+  <div class="pin-title">Alma Coffee Delivery</div>
+  <div class="pin-subtitle">Enter your driver PIN</div>
+  <div class="pin-dots" id="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-btn" onclick="pinTap('1')">1</button>
+    <button class="pin-btn" onclick="pinTap('2')">2<div class="pin-btn-sub">ABC</div></button>
+    <button class="pin-btn" onclick="pinTap('3')">3<div class="pin-btn-sub">DEF</div></button>
+    <button class="pin-btn" onclick="pinTap('4')">4<div class="pin-btn-sub">GHI</div></button>
+    <button class="pin-btn" onclick="pinTap('5')">5<div class="pin-btn-sub">JKL</div></button>
+    <button class="pin-btn" onclick="pinTap('6')">6<div class="pin-btn-sub">MNO</div></button>
+    <button class="pin-btn" onclick="pinTap('7')">7<div class="pin-btn-sub">PQRS</div></button>
+    <button class="pin-btn" onclick="pinTap('8')">8<div class="pin-btn-sub">TUV</div></button>
+    <button class="pin-btn" onclick="pinTap('9')">9<div class="pin-btn-sub">WXYZ</div></button>
+    <button class="pin-btn" onclick="pinTap('back')" style="font-size:20px">⌫</button>
+    <button class="pin-btn" onclick="pinTap('0')">0</button>
+    <button class="pin-btn" style="opacity:0" disabled></button>
+  </div>
+  <div class="pin-error" id="pin-error"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     HOME SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="home-screen">
+  <div class="home-map-wrap">
+    <div id="home-map"></div>
+  </div>
+  <div class="home-bottom">
+    <!-- Start a Delivery — opens custom trip builder -->
+    <button class="home-start-bar" onclick="goTo('custom-trip-screen')" style="width:100%;text-align:left;cursor:pointer;border:none;background:var(--white);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.1);padding:14px 16px;display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div class="home-search-icon">🔍</div>
+      <div class="home-start-label">Start a Delivery</div>
+      <div style="margin-left:auto;font-size:18px;color:var(--gray3)">›</div>
+    </button>
+    <!-- Quick navigate buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button onclick="navigateTo('3448 Holly Springs Pkwy, Canton, GA 30115')" style="flex:1;background:var(--gray0);border:1.5px solid var(--gray2);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;font-family:inherit">
+        <div style="width:28px;height:28px;border-radius:7px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:13px;flex-shrink:0">🏠</div>
+        <div style="text-align:left">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">Alma Coffee HQ</div>
+          <div style="font-size:10px;color:var(--gray4)">3448 Holly Springs Pkwy</div>
+        </div>
+      </button>
+      <button onclick="navigateTo('145 P Rickman Industrial Dr, Canton, GA 30115')" style="flex:0 0 auto;background:var(--gray0);border:1.5px solid var(--gray2);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit">
+        <div style="width:28px;height:28px;border-radius:7px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:var(--white);font-size:13px;flex-shrink:0">🏭</div>
+        <div style="text-align:left">
+          <div style="font-size:12px;font-weight:600;color:var(--text)">Warehouse</div>
+          <div style="font-size:10px;color:var(--gray4)">145 P Rickman Dr</div>
+        </div>
+      </button>
+    </div>
+    <div class="home-grid">
+      <button class="home-tile" onclick="goTo('today-screen')">
+        <div class="home-tile-icon">📅</div>
+        <div class="home-tile-label">Today</div>
+        <div class="home-tile-badge" id="today-badge">0 stops</div>
+      </button>
+      <button class="home-tile" onclick="goTo('week-screen')">
+        <div class="home-tile-icon">🗓</div>
+        <div class="home-tile-label">This Week</div>
+      </button>
+      <button class="home-tile" onclick="goTo('routes-screen')">
+        <div class="home-tile-icon">🗺</div>
+        <div class="home-tile-label">Routes</div>
+      </button>
+      <button class="home-tile" onclick="goTo('contacts-screen')">
+        <div class="home-tile-icon">📞</div>
+        <div class="home-tile-label">Contacts</div>
+      </button>
+      <button class="home-tile" onclick="goTo('issues-screen')">
+        <div class="home-tile-icon">⚠️</div>
+        <div class="home-tile-label">Issues</div>
+      </button>
+      <button class="home-tile" onclick="goTo('past-screen')">
+        <div class="home-tile-icon">📋</div>
+        <div class="home-tile-label">Past</div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     TODAY SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="today-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Today's Deliveries</div>
+    <div class="topbar-right" id="today-date"></div>
+  </div>
+  <div class="today-map-peek"><div id="today-map"></div></div>
+  <div class="today-content">
+    <div class="today-header">
+      <div>
+        <div class="today-title">Stops</div>
+        <div class="today-meta" id="today-progress-label">0 of 0 delivered</div>
+      </div>
+      <button class="stop-btn btn-navigate" onclick="addStopSheet()" style="width:auto;padding:8px 14px;font-size:13px">+ Add stop</button>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    <div id="stop-list"></div>
+    <div class="empty-state" id="stop-empty" style="display:none">
+      <div class="empty-state-icon">📦</div>
+      <div class="empty-state-text">No stops scheduled today.<br>Admin will push your route.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     THIS WEEK SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="week-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">This Week</div>
+  </div>
+  <div class="week-content">
+    <div class="week-days" id="week-day-tabs"></div>
+    <div class="week-section-title" id="week-day-label">Monday</div>
+    <div id="week-stop-list"></div>
+    <button class="week-add-btn" onclick="addWeekStopSheet()">+ Add stop to this day</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ROUTES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="routes-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Delivery Routes</div>
+  </div>
+  <div class="routes-content" id="routes-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CONTACTS SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="contacts-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Contacts</div>
+    <button class="topbar-back" onclick="addContactSheet()" style="font-size:22px;background:none">+</button>
+  </div>
+  <div class="contacts-search">
+    <input type="text" placeholder="Search contacts…" id="contact-search" oninput="renderContacts()">
+  </div>
+  <div class="contacts-list" id="contacts-list"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     ISSUES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="issues-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Issues Log</div>
+  </div>
+  <div class="issues-content" id="issues-list"></div>
+  <button class="issue-fab" onclick="toggleIssueInput()">+</button>
+  <div class="issue-input-wrap" id="issue-input-wrap">
+    <textarea class="issue-textarea" id="issue-textarea" placeholder="Describe the issue…" rows="3"></textarea>
+    <button class="issue-submit" onclick="submitIssue()">Log Issue</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     PAST ROUTES SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="past-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Past Routes</div>
+  </div>
+  <div class="past-content" id="past-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CUSTOM TRIP SCREEN
+══════════════════════════════════════════════════════════ -->
+<div class="screen" id="custom-trip-screen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">‹</button>
+    <div class="topbar-title">Start a Delivery</div>
+    <button onclick="clearTrip()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:13px;cursor:pointer;font-family:inherit">Clear</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 16px calc(var(--safe-bot)+90px)">
+
+    <!-- Planned stops -->
+    <div style="font-size:12px;font-weight:600;color:var(--gray4);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your stops</div>
+    <div id="custom-trip-stops">
+      <div class="empty-state" style="padding:20px">
+        <div class="empty-state-icon" style="font-size:32px">📦</div>
+        <div class="empty-state-text" style="font-size:13px">Add stops below to build your route</div>
+      </div>
+    </div>
+
+    <!-- Add from existing nodes -->
+    <div class="trip-add-section">
+      <div class="trip-add-title">Add existing customer</div>
+      <div class="trip-node-scroll" id="trip-node-chips"></div>
+      <button class="trip-node-chip" onclick="addTripNode()" style="width:100%;border-radius:10px;padding:9px;text-align:center;background:var(--green-lt);border-color:var(--green);color:var(--green)">+ Add selected customer</button>
+    </div>
+
+    <!-- Add manual stop -->
+    <div class="trip-add-section">
+      <div class="trip-add-title">Add new location</div>
+      <div class="trip-manual-row" style="margin-bottom:6px">
+        <input class="trip-manual-input" id="trip-manual-name" placeholder="Business name"/>
+      </div>
+      <div class="trip-manual-row" style="margin-bottom:6px">
+        <input class="trip-manual-input" id="trip-manual-addr" placeholder="Street address"/>
+        <input class="trip-manual-input" id="trip-manual-city" placeholder="City" style="max-width:120px"/>
+      </div>
+      <div class="trip-manual-row">
+        <input class="trip-manual-input" id="trip-manual-order" placeholder="Order # (optional)" style="max-width:140px"/>
+        <input class="trip-manual-input" id="trip-manual-note" placeholder="Note (optional)"/>
+      </div>
+      <button onclick="addTripManual()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--navy);color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Add to route</button>
+    </div>
+
+    <button class="trip-start-btn" id="trip-start-btn" onclick="startCustomTrip()" disabled>Start Route</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     BOTTOM NAV (shown on all main screens except pin)
+══════════════════════════════════════════════════════════ -->
+<div class="bottom-nav" id="bottom-nav" style="display:none">
+  <button class="nav-item active" onclick="goTo('home-screen')" id="nav-home">
+    <div class="nav-icon">🏠</div><div class="nav-label">Home</div>
+  </button>
+  <button class="nav-item" onclick="goTo('today-screen')" id="nav-today">
+    <div class="nav-icon">📅</div><div class="nav-label">Today</div>
+  </button>
+  <button class="nav-item" onclick="goTo('week-screen')" id="nav-week">
+    <div class="nav-icon">🗓</div><div class="nav-label">Week</div>
+  </button>
+  <button class="nav-item" onclick="goTo('issues-screen')" id="nav-issues">
+    <div class="nav-icon">⚠️</div><div class="nav-label">Issues</div>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SHEET MODALS
+══════════════════════════════════════════════════════════ -->
+<div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()">
+  <div class="sheet" id="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/*
+================================================================================
+  ALMA COFFEE DRIVER APP
+  PWA for iPhone | Supabase backend shared with admin planning tool
+  
+  SUPABASE: https://dclvscfotnhhknhbgzhm.supabase.co
+  Tables used: driver_routes, driver_stops, driver_contacts, driver_issues,
+               nodes (read-only for stop data), named_routes (read-only)
+  
+  PIN: Default is 1234. Admin sets driver PIN in Supabase driver_config table.
+  
+  TO INSTALL ON iPHONE: Open in Safari → Share → "Add to Home Screen"
+================================================================================
+*/
+
+const SUPA_URL = 'https://dclvscfotnhhknhbgzhm.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjbHZzY2ZvdG5oaGtuaGJnemhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDM4NzIsImV4cCI6MjEwMTUxOTg3Mn0.DMfpDUdRWUnddTp7KWLcSyJoeLymVVNTRd2zCbZbTVE';
+const DRIVER_PIN = '1234'; // Change this — admin sets in Supabase
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentScreen = 'pin-screen';
+let screenHistory = [];
+let pinEntry = '';
+let todayStops = [];   // {id, name, address, orderNum, instructions, stopNote, status, arrivedAt, deliveredAt, lat, lng}
+let weekData = {};     // {date: [stops]}
+let contacts = [];     // {id, name, role, business, phone}
+let issues = [];       // {id, text, timestamp}
+let namedRoutes = [];  // from Supabase named_routes
+let selectedWeekDay = null;
+let homeMap = null, todayMap = null;
+let driverLat = null, driverLng = null;
+let watchId = null;
+let driverMarker = null;
+
+const ROASTERY = {lat: 34.23607, lng: -84.49079};
+
+// ── Supabase helpers ───────────────────────────────────────────────────────
+async function sbGet(table, filter='') {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*${filter}&order=id.asc`, {
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    });
+    if (!r.ok) return [];
+    return r.json();
+  } catch(e) { return []; }
+}
+
+async function sbUpsert(table, row) {
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'},
+      body: JSON.stringify(row)
+    });
+  } catch(e) { console.warn('Save failed', e); }
+}
+
+async function sbDelete(table, id) {
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    });
+  } catch(e) {}
+}
+
+// ── PIN AUTH ───────────────────────────────────────────────────────────────
+function pinTap(val) {
+  if (val === 'back') {
+    pinEntry = pinEntry.slice(0, -1);
+  } else if (pinEntry.length < 4) {
+    pinEntry += val;
+  }
+  updatePinDots();
+  if (pinEntry.length === 4) {
+    setTimeout(() => checkPin(), 100);
+  }
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('d' + i).classList.toggle('filled', i < pinEntry.length);
+  }
+}
+
+async function checkPin() {
+  // Check against Supabase config first, fall back to hardcoded
+  let correctPin = DRIVER_PIN;
+  try {
+    const config = await sbGet('driver_config');
+    if (config && config[0] && config[0].driver_pin) correctPin = config[0].driver_pin;
+  } catch(e) {}
+
+  if (pinEntry === correctPin) {
+    document.getElementById('pin-error').textContent = '';
+    goTo('home-screen');
+    initApp();
+  } else {
+    document.getElementById('pin-error').textContent = 'Incorrect PIN. Try again.';
+    pinEntry = '';
+    updatePinDots();
+    // Shake animation
+    const dots = document.getElementById('pin-dots');
+    dots.style.transform = 'translateX(-10px)';
+    setTimeout(() => dots.style.transform = 'translateX(10px)', 80);
+    setTimeout(() => dots.style.transform = 'translateX(-6px)', 160);
+    setTimeout(() => dots.style.transform = '', 240);
+  }
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────
+function goTo(screenId) {
+  if (screenId === currentScreen) return;
+  screenHistory.push(currentScreen);
+  document.getElementById(currentScreen).classList.remove('active');
+  document.getElementById(screenId).classList.add('active');
+  currentScreen = screenId;
+  const showNav = screenId !== 'pin-screen';
+  document.getElementById('bottom-nav').style.display = showNav ? 'flex' : 'none';
+  // Nav highlight
+  ['home-screen','today-screen','week-screen','issues-screen'].forEach((s, i) => {
+    const navIds = ['nav-home','nav-today','nav-week','nav-issues'];
+    document.getElementById(navIds[i]).classList.toggle('active', s === screenId);
+  });
+  // Init maps lazily
+  if (screenId === 'home-screen' && !homeMap) initHomeMap();
+  if (screenId === 'today-screen' && !todayMap) initTodayMap();
+  if (screenId === 'today-screen') renderStopList();
+  if (screenId === 'week-screen') renderWeek();
+  if (screenId === 'routes-screen') renderRoutes();
+  if (screenId === 'contacts-screen') renderContacts();
+  if (screenId === 'custom-trip-screen') initCustomTrip();
+  if (screenId === 'issues-screen') renderIssues();
+  if (screenId === 'past-screen') renderPast();
+}
+
+function goBack() {
+  if (screenHistory.length > 0) {
+    const prev = screenHistory.pop();
+    document.getElementById(currentScreen).classList.remove('active');
+    document.getElementById(prev).classList.add('active');
+    currentScreen = prev;
+  }
+}
+
+// ── APP INIT ───────────────────────────────────────────────────────────────
+async function initApp() {
+  startGPS();
+  await loadAll();
+  renderHome();
+}
+
+async function loadAll() {
+  // Load today's stops from Supabase driver_routes pushed for today
+  const today = new Date().toISOString().slice(0, 10);
+  const pushed = await sbGet('driver_routes', `&date=eq.${today}&order=stop_order.asc`);
+  if (pushed && pushed.length) {
+    todayStops = pushed.map(r => ({
+      id: r.id, name: r.stop_name, address: r.stop_address,
+      orderNum: r.order_num || '', instructions: r.instructions || '',
+      stopNote: r.stop_note || '', status: r.status || 'pending',
+      arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
+      lat: r.lat, lng: r.lng
+    }));
+  }
+
+  // Load week data
+  const allWeek = await sbGet('driver_routes', `&order=date.asc,stop_order.asc`);
+  weekData = {};
+  if (allWeek) allWeek.forEach(r => {
+    if (!weekData[r.date]) weekData[r.date] = [];
+    weekData[r.date].push(r);
+  });
+
+  // Load named routes from admin tool
+  namedRoutes = await sbGet('named_routes') || [];
+
+  // Load contacts
+  contacts = await sbGet('driver_contacts') || [];
+
+  // Load issues
+  issues = await sbGet('driver_issues', '&order=created_at.desc') || [];
+
+  // Cache nodes globally for custom trip builder
+  try {
+    const allNodes = await sbGet('nodes');
+    if (allNodes && allNodes.length) {
+      window.ALL_NODES = allNodes.map(n => ({
+        id: n.id, name: n.name, address: n.address, lat: n.lat, lng: n.lng
+      }));
+    }
+  } catch(e) {}
+  // Update today badge
+  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
+
+// ── GPS ────────────────────────────────────────────────────────────────────
+function startGPS() {
+  if (!navigator.geolocation) return;
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      driverLat = pos.coords.latitude;
+      driverLng = pos.coords.longitude;
+      updateDriverMarker();
+    },
+    err => console.log('GPS error:', err),
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 5000}
+  );
+}
+
+function updateDriverMarker() {
+  if (!driverLat || !driverLng) return;
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:#0033A0;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8]
+  });
+  [homeMap, todayMap].forEach(m => {
+    if (!m) return;
+    if (!driverMarker) driverMarker = L.marker([driverLat, driverLng], {icon}).addTo(m);
+    else driverMarker.setLatLng([driverLat, driverLng]);
+  });
+}
+
+// ── HOME ───────────────────────────────────────────────────────────────────
+function renderHome() {
+  document.getElementById('today-badge').textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
+
+function initHomeMap() {
+  homeMap = L.map('home-map', {zoomControl: false, attributionControl: false})
+    .setView([ROASTERY.lat, ROASTERY.lng], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(homeMap);
+  L.circleMarker([ROASTERY.lat, ROASTERY.lng], {
+    radius: 8, fillColor: '#0033A0', fillOpacity: 1, color: '#fff', weight: 2
+  }).addTo(homeMap).bindPopup('Alma Coffee HQ');
+  todayStops.forEach(s => {
+    if (s.lat && s.lng) L.circleMarker([s.lat, s.lng], {
+      radius: 6, fillColor: '#2E7D32', fillOpacity: .9, color: '#fff', weight: 1.5
+    }).addTo(homeMap);
+  });
+}
+
+// ── TODAY / STOPS ──────────────────────────────────────────────────────────
+function initTodayMap() {
+  todayMap = L.map('today-map', {zoomControl: false, attributionControl: false})
+    .setView([ROASTERY.lat, ROASTERY.lng], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(todayMap);
+  // Draw route line
+  if (todayStops.length) {
+    const pts = [[ROASTERY.lat, ROASTERY.lng],
+      ...todayStops.filter(s => s.lat && s.lng).map(s => [s.lat, s.lng]),
+      [ROASTERY.lat, ROASTERY.lng]];
+    L.polyline(pts, {color: '#0033A0', weight: 2.5, opacity: .7}).addTo(todayMap);
+    todayStops.forEach((s, i) => {
+      if (!s.lat || !s.lng) return;
+      const color = s.status === 'delivered' ? '#2E7D32' : s.status === 'arrived' ? '#C9A84C' : '#0033A0';
+      L.circleMarker([s.lat, s.lng], {
+        radius: 9, fillColor: color, fillOpacity: 1, color: '#fff', weight: 2
+      }).addTo(todayMap).bindPopup(`${i+1}. ${s.name}`);
+    });
+    if (pts.length > 1) todayMap.fitBounds(L.latLngBounds(pts), {padding: [20, 20]});
+  }
+}
+
+function renderStopList() {
+  const el = document.getElementById('stop-list');
+  const empty = document.getElementById('stop-empty');
+  const delivered = todayStops.filter(s => s.status === 'delivered').length;
+  const total = todayStops.length;
+
+  document.getElementById('today-progress-label').textContent = `${delivered} of ${total} delivered`;
+  document.getElementById('progress-fill').style.width = total ? `${(delivered/total)*100}%` : '0%';
+
+  if (!total) { el.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  el.innerHTML = todayStops.map((s, i) => {
+    const isActive = s.status === 'pending' && (i === 0 || todayStops[i-1]?.status === 'delivered');
+    const isDelivered = s.status === 'delivered';
+    const isArrived = s.status === 'arrived';
+    const numClass = isDelivered ? 'delivered-num' : isActive || isArrived ? 'active-num' : '';
+    const cardClass = isActive || isArrived ? 'active' : isDelivered ? 'delivered' : '';
+
+    return `<div class="stop-card ${cardClass}" id="stop-${i}">
+      <div class="stop-card-inner">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="stop-num ${numClass}">${isDelivered ? '✓' : i+1}</span>
+          <div style="flex:1;min-width:0">
+            <div class="stop-name">${s.name}</div>
+            <div class="stop-addr">${s.address}</div>
+            ${s.orderNum ? `<div class="stop-order">Order: ${s.orderNum}</div>` : ''}
+            ${s.stopNote ? `<div class="stop-note">📝 ${s.stopNote}</div>` : ''}
+          </div>
+        </div>
+        ${isArrived && s.instructions ? `
+        <div class="instructions-panel">
+          <div class="instructions-label">Delivery Instructions</div>
+          ${s.instructions}
+        </div>` : ''}
+        ${isDelivered ? `
+        <div class="stop-delivered-row">
+          ✓ Delivered at ${s.deliveredAt ? new Date(s.deliveredAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'confirmed'}
+        </div>` : `
+        <div class="stop-actions">
+          ${!isArrived ? `<button class="stop-btn btn-arrived" onclick="markArrived(${i})">I'm Here</button>` : ''}
+          ${isArrived ? `<button class="stop-btn btn-delivered" onclick="markDelivered(${i})">Delivered ✓</button>` : ''}
+          <button class="stop-btn btn-navigate" onclick="navigateTo('${encodeURIComponent(s.address)}')">Navigate</button>
+        </div>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function markArrived(idx) {
+  const s = todayStops[idx];
+  s.status = 'arrived';
+  s.arrivedAt = new Date().toISOString();
+  // Log GPS
+  if (driverLat && driverLng) {
+    s.arrivedLat = driverLat; s.arrivedLng = driverLng;
+  }
+  await sbUpsert('driver_routes', {
+    id: s.id, status: 'arrived', arrived_at: s.arrivedAt,
+    arrived_lat: s.arrivedLat || null, arrived_lng: s.arrivedLng || null
+  });
+  // Show instructions if they exist
+  if (s.instructions) {
+    // Instructions appear inline in the card — re-render shows them
+  }
+  renderStopList();
+}
+
+async function markDelivered(idx) {
+  const s = todayStops[idx];
+  s.status = 'delivered';
+  s.deliveredAt = new Date().toISOString();
+  if (driverLat && driverLng) {
+    s.deliveredLat = driverLat; s.deliveredLng = driverLng;
+  }
+  await sbUpsert('driver_routes', {
+    id: s.id, status: 'delivered', delivered_at: s.deliveredAt,
+    delivered_lat: s.deliveredLat || null, delivered_lng: s.deliveredLng || null
+  });
+  renderStopList();
+  // Auto-scroll to next stop
+  const nextIdx = todayStops.findIndex((s2, i) => i > idx && s2.status === 'pending');
+  if (nextIdx >= 0) {
+    setTimeout(() => {
+      const el = document.getElementById(`stop-${nextIdx}`);
+      if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }, 300);
+  }
+}
+
+function navigateTo(encodedAddr) {
+  const addr = decodeURIComponent(encodedAddr);
+  // Opens Apple Maps with the address
+  window.open(`http://maps.apple.com/?daddr=${encodeURIComponent(addr)}&dirflg=d`, '_blank');
+}
+
+// ── THIS WEEK ──────────────────────────────────────────────────────────────
+function renderWeek() {
+  const today = new Date();
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - today.getDay() + i);
+    days.push(d);
+  }
+
+  const tabEl = document.getElementById('week-day-tabs');
+  tabEl.innerHTML = days.map(d => {
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString('en', {weekday: 'short'}) + ' ' + d.getDate();
+    const hasStops = weekData[key] && weekData[key].length > 0;
+    const isToday = key === today.toISOString().slice(0, 10);
+    const isSelected = key === selectedWeekDay;
+    return `<button class="week-day-btn${hasStops?' has-stops':''}${isSelected?' active':''}" onclick="selectWeekDay('${key}')">${label}${isToday?' ·':''}</button>`;
+  }).join('');
+
+  if (!selectedWeekDay) selectWeekDay(today.toISOString().slice(0, 10));
+  else renderWeekStops();
+}
+
+function selectWeekDay(dateKey) {
+  selectedWeekDay = dateKey;
+  const d = new Date(dateKey + 'T12:00:00');
+  document.getElementById('week-day-label').textContent =
+    d.toLocaleDateString('en', {weekday: 'long', month: 'long', day: 'numeric'});
+  renderWeek();
+  renderWeekStops();
+}
+
+function renderWeekStops() {
+  const el = document.getElementById('week-stop-list');
+  const stops = weekData[selectedWeekDay] || [];
+  if (!stops.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No deliveries scheduled</div></div>`;
+    return;
+  }
+  el.innerHTML = stops.map((s, i) => `
+    <div class="week-stop-item" draggable="true" data-idx="${i}">
+      <div class="week-stop-drag">⠿</div>
+      <div class="week-stop-info">
+        <div class="week-stop-name">${s.stop_name || s.name}</div>
+        ${(s.order_num || s.orderNum) ? `<div class="week-stop-order">Order: ${s.order_num || s.orderNum}</div>` : ''}
+      </div>
+      <span class="tag tag-navy">#${i+1}</span>
+    </div>
+  `).join('');
+}
+
+// ── ROUTES ─────────────────────────────────────────────────────────────────
+function renderRoutes() {
+  const el = document.getElementById('routes-content');
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const COLORS = ['#1E88E5','#43A047','#FB8C00','#E53935','#8E24AA','#00ACC1','#F4511E'];
+  if (!namedRoutes.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗺</div><div class="empty-state-text">No routes set up yet.<br>Admin creates routes in the planning tool.</div></div>`;
+    return;
+  }
+  el.innerHTML = namedRoutes.map((rt, idx) => {
+    const color = rt.color || COLORS[idx % COLORS.length];
+    const nodeIds = rt.node_ids ? (typeof rt.node_ids === 'string' ? JSON.parse(rt.node_ids) : rt.node_ids) : [];
+    return `<div class="route-zone-card">
+      <div class="route-zone-hdr" onclick="toggleRouteZone('rz-${rt.id}')">
+        <div class="route-zone-color" style="background:${color}"></div>
+        <div class="route-zone-name">${rt.name}</div>
+        <div class="route-zone-meta">${DAYS[rt.day] || ''} · ${nodeIds.length} stops</div>
+      </div>
+      <div class="route-zone-stops" id="rz-${rt.id}">
+        ${nodeIds.map((nid, i) => `<div class="route-stop-row"><span style="color:${color};font-weight:600">${i+1}</span><span>Stop ${nid}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleRouteZone(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── CONTACTS ───────────────────────────────────────────────────────────────
+function renderContacts() {
+  const q = document.getElementById('contact-search')?.value.toLowerCase() || '';
+  const el = document.getElementById('contacts-list');
+  const filtered = contacts.filter(c =>
+    c.name?.toLowerCase().includes(q) ||
+    c.business?.toLowerCase().includes(q) ||
+    c.role?.toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📞</div><div class="empty-state-text">No contacts yet.<br>Tap + to add one.</div></div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(c => `
+    <div class="contact-row">
+      <div class="contact-avatar">${(c.name||'?')[0].toUpperCase()}</div>
+      <div class="contact-info">
+        <div class="contact-name">${c.name || '—'}</div>
+        ${c.role ? `<div class="contact-role">${c.role}</div>` : ''}
+        ${c.business ? `<div class="contact-biz">${c.business}</div>` : ''}
+      </div>
+      ${c.phone ? `<a href="tel:${c.phone}" class="contact-call">📞</a>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── ISSUES ─────────────────────────────────────────────────────────────────
+function renderIssues() {
+  const el = document.getElementById('issues-list');
+  if (!issues.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No issues logged yet.</div></div>`;
+    return;
+  }
+  el.innerHTML = issues.map(issue => `
+    <div class="issue-card">
+      <div class="issue-time">${new Date(issue.created_at || issue.timestamp).toLocaleString('en', {dateStyle:'medium',timeStyle:'short'})}</div>
+      <div class="issue-text">${issue.text || issue.note}</div>
+    </div>
+  `).join('');
+}
+
+function toggleIssueInput() {
+  const el = document.getElementById('issue-input-wrap');
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) document.getElementById('issue-textarea').focus();
+}
+
+async function submitIssue() {
+  const text = document.getElementById('issue-textarea').value.trim();
+  if (!text) return;
+  const issue = {
+    id: 'iss-' + Date.now(),
+    text,
+    note: text,
+    created_at: new Date().toISOString(),
+    timestamp: new Date().toISOString()
+  };
+  issues.unshift(issue);
+  await sbUpsert('driver_issues', {id: issue.id, note: text, created_at: issue.created_at});
+  document.getElementById('issue-textarea').value = '';
+  document.getElementById('issue-input-wrap').classList.remove('open');
+  renderIssues();
+}
+
+// ── PAST ROUTES ─────────────────────────────────────────────────────────────
+function renderPast() {
+  const el = document.getElementById('past-content');
+  // Group delivered stops by date
+  const allRoutes = Object.entries(weekData).sort((a, b) => b[0].localeCompare(a[0]));
+  if (!allRoutes.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No past routes yet.</div></div>`;
+    return;
+  }
+  el.innerHTML = allRoutes.map(([date, stops]) => {
+    const delivered = stops.filter(s => s.status === 'delivered').length;
+    const d = new Date(date + 'T12:00:00');
+    const label = d.toLocaleDateString('en', {weekday:'long',month:'long',day:'numeric'});
+    return `<div class="past-route-card" onclick="togglePast('past-${date}')">
+      <div class="past-route-date">${label}</div>
+      <div class="past-route-meta">${stops.length} stops · ${delivered} delivered</div>
+      <div class="past-route-stops" id="past-${date}">
+        ${stops.map(s => `
+        <div class="past-stop-row">
+          <span>${s.stop_name || s.name}</span>
+          ${s.status === 'delivered' ? `<span class="past-stop-time">✓ ${s.delivered_at ? new Date(s.delivered_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'delivered'}</span>` : '<span style="color:var(--gray3)">—</span>'}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePast(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── SHEETS (modal bottom sheets) ────────────────────────────────────────────
+function openSheet(content) {
+  document.getElementById('sheet-content').innerHTML = content;
+  document.getElementById('sheet-backdrop').classList.add('open');
+}
+function closeSheet() {
+  document.getElementById('sheet-backdrop').classList.remove('open');
+}
+
+function addStopSheet() {
+  openSheet(`
+    <div class="sheet-title">Add a Stop</div>
+    <div class="sheet-field"><div class="sheet-label">Business name</div>
+      <input class="sheet-input" id="sh-name" placeholder="e.g. Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Address</div>
+      <input class="sheet-input" id="sh-addr" placeholder="Street, City, GA"/></div>
+    <div class="sheet-field"><div class="sheet-label">Order number</div>
+      <input class="sheet-input" id="sh-order" placeholder="#129010 (optional)"/></div>
+    <div class="sheet-field"><div class="sheet-label">Delivery note</div>
+      <input class="sheet-input" id="sh-note" placeholder="e.g. call ahead (optional)"/></div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveAddStop()">Add to Today's Route</button>
+  `);
+}
+
+async function saveAddStop() {
+  const name = document.getElementById('sh-name').value.trim();
+  const addr = document.getElementById('sh-addr').value.trim();
+  if (!name || !addr) return;
+  const stop = {
+    id: 'stop-' + Date.now(),
+    stop_name: name, name,
+    stop_address: addr, address: addr,
+    order_num: document.getElementById('sh-order').value.trim(),
+    stop_note: document.getElementById('sh-note').value.trim(),
+    status: 'pending',
+    date: new Date().toISOString().slice(0, 10),
+    stop_order: todayStops.length + 1,
+    lat: null, lng: null, instructions: ''
+  };
+  todayStops.push(stop);
+  await sbUpsert('driver_routes', stop);
+  closeSheet();
+  renderStopList();
+  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length!==1?'s':''}`;
+}
+
+function addWeekStopSheet() {
+  openSheet(`
+    <div class="sheet-title">Add Stop to ${document.getElementById('week-day-label').textContent}</div>
+    <div class="sheet-field"><div class="sheet-label">Business name</div>
+      <input class="sheet-input" id="wsh-name" placeholder="e.g. Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Order number</div>
+      <input class="sheet-input" id="wsh-order" placeholder="#129010 (optional)"/></div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveWeekStop()">Add</button>
+  `);
+}
+
+async function saveWeekStop() {
+  const name = document.getElementById('wsh-name').value.trim();
+  if (!name || !selectedWeekDay) return;
+  if (!weekData[selectedWeekDay]) weekData[selectedWeekDay] = [];
+  const stop = {
+    id: 'wstop-' + Date.now(),
+    stop_name: name,
+    order_num: document.getElementById('wsh-order').value.trim(),
+    date: selectedWeekDay,
+    stop_order: weekData[selectedWeekDay].length + 1,
+    status: 'pending'
+  };
+  weekData[selectedWeekDay].push(stop);
+  await sbUpsert('driver_routes', stop);
+  closeSheet();
+  renderWeek();
+  renderWeekStops();
+}
+
+function addContactSheet() {
+  openSheet(`
+    <div class="sheet-title">Add Contact</div>
+    <div class="sheet-field"><div class="sheet-label">Name *</div>
+      <input class="sheet-input" id="csh-name" placeholder="Marcus Johnson"/></div>
+    <div class="sheet-field"><div class="sheet-label">Business</div>
+      <input class="sheet-input" id="csh-biz" placeholder="Stout Brothers"/></div>
+    <div class="sheet-field"><div class="sheet-label">Role / Title</div>
+      <input class="sheet-input" id="csh-role" placeholder="Manager (optional)"/></div>
+    <div class="sheet-field"><div class="sheet-label">Phone number *</div>
+      <input class="sheet-input" id="csh-phone" type="tel" placeholder="(678) 555-1234"/></div>
+    <button class="sheet-btn" onclick="saveContact()">Save Contact</button>
+  `);
+}
+
+async function saveContact() {
+  const name = document.getElementById('csh-name').value.trim();
+  const phone = document.getElementById('csh-phone').value.trim();
+  if (!name) return;
+  const c = {
+    id: 'con-' + Date.now(),
+    name,
+    business: document.getElementById('csh-biz').value.trim(),
+    role: document.getElementById('csh-role').value.trim(),
+    phone
+  };
+  contacts.push(c);
+  await sbUpsert('driver_contacts', c);
+  closeSheet();
+  renderContacts();
+}
+
+// ── CUSTOM TRIP ──────────────────────────────────────────────────────────────
+// Stores stops the driver builds from scratch for an ad-hoc delivery run
+let customTripStops = [];
+let selectedTripNodeId = null;
+
+function initCustomTrip() {
+  // Populate node chips from NODES data loaded from Supabase
+  const chipEl = document.getElementById('trip-node-chips');
+  // Use the namedRoutes nodes or a flat node list if available
+  // For now pull from a globally available node list
+  if (window.ALL_NODES && window.ALL_NODES.length) {
+    chipEl.innerHTML = window.ALL_NODES.map(n =>
+      `<button class="trip-node-chip" id="chip-${n.id}" onclick="selectTripNode(${n.id},'${n.name.replace(/'/g,"\'")}','${(n.address||'').replace(/'/g,"\'")}')">
+        ${n.name.split(' ')[0]}
+      </button>`
+    ).join('');
+  } else {
+    chipEl.innerHTML = '<div style="font-size:12px;color:var(--gray4)">No customers loaded yet</div>';
+  }
+  renderCustomTripStops();
+}
+
+function selectTripNode(id, name, addr) {
+  selectedTripNodeId = {id, name, addr};
+  document.querySelectorAll('.trip-node-chip').forEach(c => c.classList.remove('selected'));
+  const chip = document.getElementById('chip-' + id);
+  if (chip) chip.classList.add('selected');
+}
+
+function addTripNode() {
+  if (!selectedTripNodeId) return;
+  customTripStops.push({
+    id: 'ct-' + Date.now(),
+    name: selectedTripNodeId.name,
+    address: selectedTripNodeId.addr,
+    orderNum: '',
+    stopNote: ''
+  });
+  selectedTripNodeId = null;
+  document.querySelectorAll('.trip-node-chip').forEach(c => c.classList.remove('selected'));
+  renderCustomTripStops();
+}
+
+function addTripManual() {
+  const name = document.getElementById('trip-manual-name').value.trim();
+  const addr = document.getElementById('trip-manual-addr').value.trim();
+  const city = document.getElementById('trip-manual-city').value.trim();
+  if (!name) return;
+  customTripStops.push({
+    id: 'ct-' + Date.now(),
+    name,
+    address: [addr, city, 'GA'].filter(Boolean).join(', '),
+    orderNum: document.getElementById('trip-manual-order').value.trim(),
+    stopNote: document.getElementById('trip-manual-note').value.trim()
+  });
+  ['trip-manual-name','trip-manual-addr','trip-manual-city','trip-manual-order','trip-manual-note']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  renderCustomTripStops();
+}
+
+function removeTripStop(idx) {
+  customTripStops.splice(idx, 1);
+  renderCustomTripStops();
+}
+
+function renderCustomTripStops() {
+  const el = document.getElementById('custom-trip-stops');
+  const btn = document.getElementById('trip-start-btn');
+  btn.disabled = customTripStops.length === 0;
+  if (!customTripStops.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:20px">
+      <div class="empty-state-icon" style="font-size:32px">📦</div>
+      <div class="empty-state-text" style="font-size:13px">Add stops below to build your route</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = customTripStops.map((s, i) => `
+    <div class="trip-stop-item">
+      <div class="trip-stop-num">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div class="trip-stop-name">${s.name}</div>
+        <div class="trip-stop-addr">${s.address || '—'}</div>
+        ${s.orderNum ? `<div style="font-size:11px;color:var(--navy);margin-top:2px">Order: ${s.orderNum}</div>` : ''}
+      </div>
+      <button onclick="removeTripStop(${i})" style="background:var(--red-lt);color:var(--red);border:none;border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;font-family:inherit">✕</button>
+    </div>
+  `).join('');
+}
+
+function clearTrip() {
+  customTripStops = [];
+  renderCustomTripStops();
+}
+
+async function startCustomTrip() {
+  if (!customTripStops.length) return;
+  // Push these stops to todayStops and navigate to Today screen
+  const today = new Date().toISOString().slice(0, 10);
+  const newStops = customTripStops.map((s, i) => ({
+    id: s.id,
+    stop_name: s.name, name: s.name,
+    stop_address: s.address, address: s.address,
+    order_num: s.orderNum, orderNum: s.orderNum,
+    stop_note: s.stopNote, stopNote: s.stopNote,
+    status: 'pending',
+    date: today,
+    stop_order: todayStops.length + i + 1,
+    instructions: '',
+    lat: null, lng: null
+  }));
+  // Save to Supabase
+  await Promise.all(newStops.map(s => sbUpsert('driver_routes', s)));
+  // Add to today's live list
+  newStops.forEach(s => todayStops.push(s));
+  document.getElementById('today-badge').textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+  customTripStops = [];
+  goTo('today-screen');
+  renderStopList();
+}
+
+// ── DATE display ────────────────────────────────────────────────────────────
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('en', {month:'short', day:'numeric'});
+
+</script>
+</body>
 </html>
