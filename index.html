@@ -108,7 +108,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .today-meta{font-size:13px;color:var(--gray4)}
 .progress-bar{background:var(--gray2);border-radius:4px;height:6px;margin-bottom:16px;overflow:hidden}
 .progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s}
-.stop-card{background:var(--white);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;overflow:hidden;border:2px solid transparent;transition:border-color .2s}
+.stop-card{background:var(--white);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:10px;overflow:hidden;border:2px solid transparent;transition:border-color .2s;position:relative}
 .stop-card.active{border-color:var(--green)}
 .stop-card.delivered{opacity:.55}
 .stop-card-inner{padding:14px 14px 12px}
@@ -756,14 +756,22 @@ function renderStopList() {
           ${s.instructions}
         </div>` : ''}
         ${isDelivered ? `
-        <div class="stop-delivered-row">
-          ✓ Delivered at ${s.deliveredAt ? new Date(s.deliveredAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'confirmed'}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px">
+          <div class="stop-delivered-row" style="margin-top:0">
+            ✓ Delivered at ${s.deliveredAt ? new Date(s.deliveredAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'confirmed'}
+          </div>
+          <button onclick="undoStop(${i})" style="background:var(--red-lt);color:var(--red);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:500">Undo</button>
         </div>` : `
         <div class="stop-actions">
           ${!isArrived ? `<button class="stop-btn btn-arrived" onclick="markArrived(${i})">I'm Here</button>` : ''}
-          ${isArrived ? `<button class="stop-btn btn-delivered" onclick="markDelivered(${i})">Delivered ✓</button>` : ''}
-          <button class="stop-btn btn-navigate" onclick="navigateTo('${encodeURIComponent(s.address)}')">Navigate</button>
+          ${isArrived ? `
+            <button class="stop-btn btn-delivered" onclick="markDelivered(${i})">Delivered ✓</button>
+            <button class="stop-btn btn-navigate" onclick="undoStop(${i})" style="background:var(--red-lt);color:var(--red);flex:0 0 auto;padding:10px 10px">Undo</button>
+          ` : ''}
+          ${!isArrived ? `<button class="stop-btn btn-navigate" onclick="navigateTo('${encodeURIComponent(s.address)}')">Navigate</button>` : ''}
         </div>`}
+        ${!isDelivered ? `
+        <button onclick="removeStop(${i})" style="position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:var(--gray2);border:none;color:var(--gray5);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">×</button>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -808,6 +816,31 @@ async function markDelivered(idx) {
       if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
     }, 300);
   }
+}
+
+async function undoStop(idx) {
+  const s = todayStops[idx];
+  s.status = 'pending';
+  s.arrivedAt = null; s.deliveredAt = null;
+  s.arrivedLat = null; s.arrivedLng = null;
+  s.deliveredLat = null; s.deliveredLng = null;
+  await sbUpsert('driver_routes', {
+    id: s.id, status: 'pending',
+    arrived_at: null, delivered_at: null,
+    arrived_lat: null, arrived_lng: null,
+    delivered_lat: null, delivered_lng: null
+  });
+  renderStopList();
+}
+
+async function removeStop(idx) {
+  if (!confirm('Remove this stop from today\'s route?')) return;
+  const s = todayStops[idx];
+  await sbDelete('driver_routes', s.id);
+  todayStops.splice(idx, 1);
+  renderStopList();
+  document.getElementById('today-badge').textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
 }
 
 function navigateTo(encodedAddr) {
