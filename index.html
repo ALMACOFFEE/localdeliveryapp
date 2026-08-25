@@ -221,6 +221,25 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .empty-state-icon{font-size:48px;margin-bottom:12px}
 .empty-state-text{font-size:15px}
 
+/* Route session panel */
+.route-session{background:var(--white);border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:14px;margin-bottom:12px;border:2px solid transparent}
+.route-session.started{border-color:var(--green)}
+.route-session.ended{border-color:var(--gray2);opacity:.85}
+.session-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.session-row:last-child{margin-bottom:0}
+.session-btn{flex:0 0 auto;padding:8px 14px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.session-btn-start{background:var(--green);color:var(--white)}
+.session-btn-end{background:var(--navy);color:var(--white)}
+.session-btn-end.done{background:var(--gray1);color:var(--gray4)}
+.session-time{flex:1;font-size:13px;color:var(--text);font-weight:500}
+.session-time-edit{font-size:11px;color:var(--primary);cursor:pointer;margin-left:6px;text-decoration:underline}
+.session-time-input{border:1px solid var(--gray2);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit;color:var(--text);background:var(--white);outline:none}
+.session-time-input:focus{border-color:var(--navy)}
+.session-odo{width:100px;border:1px solid var(--gray2);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit;color:var(--text);background:var(--gray0);outline:none;text-align:center}
+.session-odo:focus{border-color:var(--navy);background:var(--white)}
+.session-label{font-size:11px;color:var(--gray4);font-weight:500;min-width:50px}
+.session-divider{height:1px;background:var(--gray1);margin:8px 0}
+
 /* Drag reorder */
 .dragging{opacity:.5;transform:scale(1.02)}
 
@@ -329,6 +348,34 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   </div>
   <div class="today-map-peek"><div id="today-map"></div></div>
   <div class="today-content">
+    <!-- Route session panel -->
+    <div class="route-session" id="route-session-panel">
+      <!-- Start row -->
+      <div class="session-row">
+        <button class="session-btn session-btn-start" id="start-route-btn" onclick="startRoute()">Start Route</button>
+        <div class="session-time" id="start-time-display" style="color:var(--gray3)">Not started</div>
+      </div>
+      <!-- Start odometer -->
+      <div class="session-row" id="start-odo-row">
+        <div class="session-label">Odo start</div>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="session-odo" id="start-odo" placeholder="e.g. 42100" onblur="saveSessionData()"/>
+        <div style="font-size:11px;color:var(--gray4)">miles</div>
+      </div>
+      <div class="session-divider"></div>
+      <!-- End row -->
+      <div class="session-row">
+        <button class="session-btn session-btn-end" id="end-route-btn" onclick="endRoute()">End Route</button>
+        <div class="session-time" id="end-time-display" style="color:var(--gray3)">Not ended</div>
+      </div>
+      <!-- End odometer -->
+      <div class="session-row" id="end-odo-row">
+        <div class="session-label">Odo end</div>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="session-odo" id="end-odo" placeholder="e.g. 42164" onblur="saveSessionData()"/>
+        <div style="font-size:11px;color:var(--gray4)">miles</div>
+        <div class="session-time" id="total-miles-display" style="font-size:12px;color:var(--green);font-weight:600"></div>
+      </div>
+    </div>
+
     <div class="today-header">
       <div>
         <div class="today-title">Stops</div>
@@ -581,7 +628,10 @@ function goTo(screenId) {
   // Init maps lazily
   if (screenId === 'home-screen' && !homeMap) initHomeMap();
   if (screenId === 'today-screen' && !todayMap) initTodayMap();
-  if (screenId === 'today-screen') renderStopList();
+  if (screenId === 'today-screen') {
+    renderStopList();
+    loadSessionData();
+  }
   if (screenId === 'week-screen') renderWeek();
   if (screenId === 'routes-screen') renderRoutes();
   if (screenId === 'contacts-screen') renderContacts();
@@ -816,6 +866,153 @@ async function markDelivered(idx) {
       if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
     }, 300);
   }
+}
+
+// ── ROUTE SESSION ────────────────────────────────────────────────────────
+function getSessionKey() {
+  return `session-${new Date().toISOString().slice(0,10)}`;
+}
+
+async function loadSessionData() {
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const r = await fetch(
+      `${SUPA_URL}/rest/v1/driver_route_sessions?date=eq.${today}&select=*&limit=1`,
+      {headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}}
+    );
+    if (r.ok) {
+      const rows = await r.json();
+      if (rows && rows[0]) {
+        const s = rows[0];
+        routeSession = {
+          startTime: s.start_time, endTime: s.end_time,
+          startOdo: s.start_odo, endOdo: s.end_odo, date: today, id: s.id
+        };
+        renderSessionPanel();
+      }
+    }
+  } catch(e) {}
+}
+
+async function saveSessionData() {
+  const today = new Date().toISOString().slice(0,10);
+  routeSession.startOdo = document.getElementById('start-odo').value || null;
+  routeSession.endOdo = document.getElementById('end-odo').value || null;
+  updateMilesDisplay();
+  try {
+    await sbUpsert('driver_route_sessions', {
+      id: routeSession.id || `sess-${today}`,
+      date: today,
+      start_time: routeSession.startTime || null,
+      end_time: routeSession.endTime || null,
+      start_odo: routeSession.startOdo ? parseFloat(routeSession.startOdo) : null,
+      end_odo: routeSession.endOdo ? parseFloat(routeSession.endOdo) : null,
+    });
+    if (!routeSession.id) routeSession.id = `sess-${today}`;
+  } catch(e) { console.warn('Session save failed', e); }
+}
+
+function updateMilesDisplay() {
+  const el = document.getElementById('total-miles-display');
+  const start = parseFloat(document.getElementById('start-odo').value);
+  const end = parseFloat(document.getElementById('end-odo').value);
+  if (start && end && end > start) {
+    el.textContent = `${(end - start).toFixed(1)} mi total`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+function startRoute() {
+  routeSession.startTime = new Date().toISOString();
+  renderSessionPanel();
+  saveSessionData();
+}
+
+function endRoute() {
+  routeSession.endTime = new Date().toISOString();
+  renderSessionPanel();
+  saveSessionData();
+}
+
+function editTime(field) {
+  // field = 'start' or 'end'
+  const current = field === 'start' ? routeSession.startTime : routeSession.endTime;
+  const currentVal = current
+    ? new Date(current).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:false})
+    : '';
+  const panel = document.getElementById(`${field}-time-display`);
+  panel.innerHTML = `
+    <input type="time" class="session-time-input" id="${field}-time-edit" value="${currentVal}"
+      style="margin-right:6px"/>
+    <button onclick="saveEditedTime('${field}')"
+      style="background:var(--navy);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">Save</button>
+    <button onclick="renderSessionPanel()"
+      style="background:var(--gray1);color:var(--gray5);border:none;border-radius:5px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;margin-left:4px">Cancel</button>`;
+}
+
+function saveEditedTime(field) {
+  const val = document.getElementById(`${field}-time-edit`).value;
+  if (!val) return;
+  const today = new Date().toISOString().slice(0,10);
+  const iso = new Date(`${today}T${val}:00`).toISOString();
+  if (field === 'start') routeSession.startTime = iso;
+  else routeSession.endTime = iso;
+  renderSessionPanel();
+  saveSessionData();
+}
+
+function renderSessionPanel() {
+  const fmt = iso => iso
+    ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+    : null;
+  const startFmt = fmt(routeSession.startTime);
+  const endFmt = fmt(routeSession.endTime);
+
+  // Start button
+  const startBtn = document.getElementById('start-route-btn');
+  const startDisplay = document.getElementById('start-time-display');
+  if (startFmt) {
+    startBtn.textContent = '✓ Started';
+    startBtn.style.background = 'var(--green-lt)';
+    startBtn.style.color = 'var(--green)';
+    startDisplay.style.color = 'var(--text)';
+    startDisplay.innerHTML = `${startFmt} <span class="session-time-edit" onclick="editTime('start')">Edit</span>`;
+  } else {
+    startBtn.textContent = 'Start Route';
+    startBtn.style.background = 'var(--green)';
+    startBtn.style.color = '#fff';
+    startDisplay.style.color = 'var(--gray3)';
+    startDisplay.innerHTML = 'Not started';
+  }
+
+  // End button
+  const endBtn = document.getElementById('end-route-btn');
+  const endDisplay = document.getElementById('end-time-display');
+  if (endFmt) {
+    endBtn.textContent = '✓ Ended';
+    endBtn.style.background = 'var(--gray1)';
+    endBtn.style.color = 'var(--gray4)';
+    endDisplay.style.color = 'var(--text)';
+    endDisplay.innerHTML = `${endFmt} <span class="session-time-edit" onclick="editTime('end')">Edit</span>`;
+  } else {
+    endBtn.textContent = 'End Route';
+    endBtn.style.background = 'var(--navy)';
+    endBtn.style.color = '#fff';
+    endDisplay.style.color = 'var(--gray3)';
+    endDisplay.innerHTML = 'Not ended';
+  }
+
+  // Odometer fields
+  if (routeSession.startOdo) document.getElementById('start-odo').value = routeSession.startOdo;
+  if (routeSession.endOdo) document.getElementById('end-odo').value = routeSession.endOdo;
+  updateMilesDisplay();
+
+  // Panel border
+  const panel = document.getElementById('route-session-panel');
+  if (startFmt && !endFmt) panel.className = 'route-session started';
+  else if (endFmt) panel.className = 'route-session ended';
+  else panel.className = 'route-session';
 }
 
 async function undoStop(idx) {
@@ -1135,6 +1332,13 @@ async function saveContact() {
 
 // ── CUSTOM TRIP ──────────────────────────────────────────────────────────────
 // Stores stops the driver builds from scratch for an ad-hoc delivery run
+// Route session state
+let routeSession = {
+  startTime: null, endTime: null,
+  startOdo: null, endOdo: null,
+  date: null
+};
+
 let customTripStops = [];
 let selectedTripNodeId = null;
 
