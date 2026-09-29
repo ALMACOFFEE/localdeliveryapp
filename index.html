@@ -781,36 +781,6 @@ async function loadAll() {
     `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
 }
 
-  // Load week data
-  const allWeek = await sbGet('driver_routes', `&order=date.asc,stop_order.asc`);
-  weekData = {};
-  if (allWeek) allWeek.forEach(r => {
-    if (!weekData[r.date]) weekData[r.date] = [];
-    weekData[r.date].push(r);
-  });
-
-  // Load named routes from admin tool
-  namedRoutes = await sbGet('named_routes') || [];
-
-  // Load contacts
-  contacts = await sbGet('driver_contacts') || [];
-
-  // Load issues
-  issues = await sbGet('driver_issues', '&order=created_at.desc') || [];
-
-  // Cache nodes globally for custom trip builder
-  try {
-    const allNodes = await sbGet('nodes');
-    if (allNodes && allNodes.length) {
-      window.ALL_NODES = allNodes.map(n => ({
-        id: n.id, name: n.name, address: n.address, lat: n.lat, lng: n.lng
-      }));
-    }
-  } catch(e) {}
-  // Update today badge
-  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
-}
-
 // ── GPS ────────────────────────────────────────────────────────────────────
 function startGPS() {
   if (!navigator.geolocation) return;
