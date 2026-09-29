@@ -707,18 +707,46 @@ async function initApp() {
 }
 
 async function loadAll() {
-  // Load today's stops from Supabase driver_routes pushed for today
   const today = new Date().toISOString().slice(0, 10);
-  const pushed = await sbGet('driver_routes', `&date=eq.${today}&order=stop_order.asc`);
+
+  const pushed = await sbGet('driver_routes', `&date=eq.${today}`, 'stop_order.asc');
   if (pushed && pushed.length) {
-    todayStops = pushed.map(r => ({
-      id: r.id, name: r.stop_name, address: r.stop_address,
-      orderNum: r.order_num || '', instructions: r.instructions || '',
-      stopNote: r.stop_note || '', status: r.status || 'pending',
-      arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
-      lat: r.lat, lng: r.lng
-    }));
+    todayStops = pushed
+      .sort((a,b) => (parseInt(a.stop_order)||999) - (parseInt(b.stop_order)||999))
+      .map(r => ({
+        id: r.id, name: r.stop_name, address: r.stop_address,
+        orderNum: r.order_num || '', instructions: r.instructions || '',
+        stopNote: r.stop_note || '', driverNote: r.driver_note || '',
+        status: r.status || 'pending',
+        arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
+        lat: r.lat, lng: r.lng, nodeId: r.node_id, source: r.source || 'admin'
+      }));
+    if (!CURRENT_DRIVER) CURRENT_DRIVER = pushed.find(r => r.driver)?.driver || null;
+  } else {
+    todayStops = [];
   }
+
+  const allRoutes = await sbGet('driver_routes', '', 'date.asc,stop_order.asc');
+  weekData = {};
+  if (allRoutes) allRoutes.forEach(r => {
+    if (!r.date) return;
+    (weekData[r.date] = weekData[r.date] || []).push(r);
+  });
+
+  ALL_SESSIONS = await sbGet('driver_route_sessions', '', 'date.desc') || [];
+  namedRoutes  = await sbGet('named_routes') || [];
+  contacts     = await sbGet('driver_contacts') || [];
+  issues       = await sbGet('driver_issues', '', 'created_at.desc') || [];
+
+  const allNodes = await sbGet('nodes', '', 'name.asc');
+  window.ALL_NODES = (allNodes || []).map(n => ({
+    id: n.id, name: n.name, address: n.address, lat: n.lat, lng: n.lng
+  }));
+
+  const badge = document.getElementById('today-badge');
+  if (badge) badge.textContent =
+    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
 
   // Load week data
   const allWeek = await sbGet('driver_routes', `&order=date.asc,stop_order.asc`);
