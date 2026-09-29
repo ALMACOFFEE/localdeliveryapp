@@ -576,34 +576,56 @@ let driverMarker = null;
 const ROASTERY = {lat: 34.23607, lng: -84.49079};
 
 // ── Supabase helpers ───────────────────────────────────────────────────────
-async function sbGet(table, filter='') {
+async function sbGet(table, filter = '', order = 'id.asc') {
   try {
-    const r = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*${filter}&order=id.asc`, {
-      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    const r = await fetch(
+      `${SUPA_URL}/rest/v1/${table}?select=*${filter}&order=${order}`, {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
     });
-    if (!r.ok) return [];
+    if (!r.ok) { console.error(`Read failed [${table}] ${r.status}`); return []; }
     return r.json();
-  } catch(e) { return []; }
+  } catch (e) { console.error(`Network failure [${table}]`, e); return []; }
 }
 
 async function sbUpsert(table, row) {
   try {
-    await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
       method: 'POST',
-      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates'},
+      headers: {
+        'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
       body: JSON.stringify(row)
     });
-  } catch(e) { console.warn('Save failed', e); }
+    if (!r.ok) {
+      const detail = await r.text();
+      console.error(`Write failed [${table}] ${r.status}:`, detail);
+      return { ok: false, error: detail };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error(`Network failure [${table}]`, e);
+    return { ok: false, error: String(e) };
+  }
 }
 
-async function sbDelete(table, id) {
+async function sbUpdate(table, id, patch) {
   try {
-    await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
-      method: 'DELETE',
-      headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}
+    const r = await fetch(
+      `${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(patch)
     });
-  } catch(e) {}
+    if (!r.ok) { console.error(`Update failed [${table}] ${r.status}:`, await r.text()); return { ok:false }; }
+    const rows = await r.json();
+    if (!rows.length) { console.warn(`Update matched no row: ${table} ${id}`); return { ok:false }; }
+    return { ok: true };
+  } catch (e) { console.error(`Network failure [${table}]`, e); return { ok:false }; }
 }
 
 // ── PIN AUTH — disabled, auto-login on load ─────────────────────────────
