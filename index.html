@@ -37,6 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
   link.rel = 'manifest'; link.href = manifestURL;
   document.head.appendChild(link);
 });
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible') return;
+  try {
+    await loadAll();
+    const el = document.getElementById('today-date');
+    if (el) el.textContent =
+      new Date().toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    if (currentScreen === 'today-screen') { renderStopList(); loadSessionData(); }
+    if (currentScreen === 'past-screen')  renderPast();
+    if (currentScreen === 'home-screen')  renderHome();
+  } catch (e) { console.warn('Foreground refresh failed', e); }
+});
 </script>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
