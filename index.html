@@ -556,6 +556,34 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 const SUPA_URL = 'https://dclvscfotnhhknhbgzhm.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjbHZzY2ZvdG5oaGtuaGJnemhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDM4NzIsImV4cCI6MjEwMTUxOTg3Mn0.DMfpDUdRWUnddTp7KWLcSyJoeLymVVNTRd2zCbZbTVE';
+const DRIVER_ROUTE_COLS = [
+  'id','date','stop_order','stop_name','stop_address','order_num',
+  'instructions','stop_note','driver_note','status','node_id','source',
+  'arrived_at','arrived_lat','arrived_lng',
+  'delivered_at','delivered_lat','delivered_lng',
+  'lat','lng','driver','skipped_reason'
+];
+
+function toRouteRow(obj) {
+  const row = {};
+  for (const c of DRIVER_ROUTE_COLS) if (obj[c] !== undefined) row[c] = obj[c];
+  return row;
+}
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fmtTime(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleTimeString('en-US',
+    { hour: '2-digit', minute: '2-digit' });
+}
+
+let CURRENT_DRIVER = null;
+let ALL_SESSIONS = [];
 const DRIVER_PIN = '1234'; // Change this — admin sets in Supabase
 
 // ── State ──────────────────────────────────────────────────────────────────
