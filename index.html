@@ -1321,6 +1321,8 @@ function endRoute() {
   renderSessionPanel();
   saveSessionData();
 }
+  
+function editTime(field) {
   // field = 'start' or 'end'
   const current = field === 'start' ? routeSession.startTime : routeSession.endTime;
   const currentVal = current
