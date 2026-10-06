@@ -16,6 +16,203 @@
 
 <!-- Web App Manifest (inline) -->
 <script>
+
+function getDriverName() {
+  if (window.CURRENT_DRIVER) return window.CURRENT_DRIVER;
+  let saved = null;
+  try { saved = localStorage.getItem('alma-driver'); } catch (e) {}
+  if (saved) { window.CURRENT_DRIVER = saved; return saved; }
+  return null;
+}
+
+function askDriverName() {
+  const current = getDriverName() || '';
+  const name = prompt('Who is running this route?', current);
+  if (!name || !name.trim()) return getDriverName();
+  const clean = name.trim();
+  window.CURRENT_DRIVER = clean;
+  try { localStorage.setItem('alma-driver', clean); } catch (e) {}
+  return clean;
+}
+function findStopRow(stopId, date) {
+  return (weekData[date] || []).find(r => r.id === stopId);
+}
+
+function toLocalTimeValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function editStopSheet(stopId, date) {
+  const r = findStopRow(stopId, date);
+  if (!r) return;
+  openSheet(`
+    <div class="sheet-title">Edit stop</div>
+    <div class="sheet-field"><div class="sheet-label">Business name</div>
+      <input class="sheet-input" id="es-name" value="${esc(r.stop_name || '')}"/></div>
+    <div class="sheet-field"><div class="sheet-label">Address</div>
+      <input class="sheet-input" id="es-addr" value="${esc(r.stop_address || '')}"/></div>
+    <div class="sheet-field"><div class="sheet-label">Order number</div>
+      <input class="sheet-input" id="es-order" value="${esc(r.order_num || '')}" placeholder="#135931"/>
+      <div class="field-help">Please include this if you have it — it links the delivery back to the order.</div></div>
+    <div class="sheet-field"><div class="sheet-label">Driver note</div>
+      <textarea class="sheet-input" id="es-note" rows="3" style="resize:vertical"
+        placeholder="Gate was locked, had to call ahead">${esc(r.driver_note || '')}</textarea></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="sheet-field"><div class="sheet-label">Arrived</div>
+        <input class="sheet-input" type="time" id="es-arr" value="${toLocalTimeValue(r.arrived_at)}"/></div>
+      <div class="sheet-field"><div class="sheet-label">Delivered</div>
+        <input class="sheet-input" type="time" id="es-del" value="${toLocalTimeValue(r.delivered_at)}"/></div>
+    </div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveStopEdit('${stopId}','${date}')">Save changes</button>
+    <button class="sheet-btn" style="background:var(--red-lt);color:var(--red);margin-top:6px"
+            onclick="deletePastStop('${stopId}','${date}')">Delete this stop</button>
+  `);
+}
+
+async function saveStopEdit(stopId, date) {
+  const t = id => document.getElementById(id).value.trim();
+  const timeToIso = v => v ? new Date(`${date}T${v}:00`).toISOString() : null;
+
+  const patch = {
+    stop_name:    t('es-name')  || null,
+    stop_address: t('es-addr')  || null,
+    order_num:    t('es-order') || null,
+    driver_note:  t('es-note')  || null,
+    arrived_at:   timeToIso(t('es-arr')),
+    delivered_at: timeToIso(t('es-del'))
+  };
+
+  if (!(await sbUpdate('driver_routes', stopId, patch)).ok) {
+    alert('Could not save — check your signal.'); return;
+  }
+  closeSheet();
+  await loadAll();
+  renderPast();
+  document.getElementById(`past-${date}`)?.classList.add('open');
+}
+
+async function deletePastStop(stopId, date) {
+  if (!confirm('Delete this stop from the route? This cannot be undone.')) return;
+  await sbDelete('driver_routes', stopId);
+  closeSheet();
+  await loadAll();
+  renderPast();
+  document.getElementById(`past-${date}`)?.classList.add('open');
+}
+
+function editSessionSheet(date) {
+  const s = (window.ALL_SESSIONS || []).find(x => x.date === date);
+  if (!s) return;
+  openSheet(`
+    <div class="sheet-title">Edit route — ${esc(date)}</div>
+    <div class="sheet-field"><div class="sheet-label">Driver</div>
+      <input class="sheet-input" id="ss-driver" value="${esc(s.driver || '')}" placeholder="Who ran this route"/></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="sheet-field"><div class="sheet-label">Started</div>
+        <input class="sheet-input" type="time" id="ss-start" value="${toLocalTimeValue(s.start_time)}"/></div>
+      <div class="sheet-field"><div class="sheet-label">Ended</div>
+        <input class="sheet-input" type="time" id="ss-end" value="${toLocalTimeValue(s.end_time)}"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="sheet-field"><div class="sheet-label">Odometer start</div>
+        <input class="sheet-input" type="text" inputmode="numeric" id="ss-odo1" value="${s.start_odo ?? ''}"/></div>
+      <div class="sheet-field"><div class="sheet-label">Odometer end</div>
+        <input class="sheet-input" type="text" inputmode="numeric" id="ss-odo2" value="${s.end_odo ?? ''}"/></div>
+    </div>
+    <div class="field-help" style="margin-bottom:10px">Mileage is calculated from the two odometer readings.</div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveSessionEdit('${date}')">Save changes</button>
+  `);
+}
+
+async function saveSessionEdit(date) {
+  const v = id => document.getElementById(id).value.trim();
+  // Timestamps are built from the ROUTE's date, not today — this is the bug
+  // that pushed the 8/28 end time onto 8/29.
+  const timeToIso = t => t ? new Date(`${date}T${t}:00`).toISOString() : null;
+  const s = (window.ALL_SESSIONS || []).find(x => x.date === date);
+  if (!s) return;
+
+  const patch = {
+    driver:     v('ss-driver') || null,
+    start_time: timeToIso(v('ss-start')),
+    end_time:   timeToIso(v('ss-end')),
+    start_odo:  v('ss-odo1') ? parseFloat(v('ss-odo1')) : null,
+    end_odo:    v('ss-odo2') ? parseFloat(v('ss-odo2')) : null
+  };
+
+  if (!(await sbUpdate('driver_route_sessions', s.id, patch)).ok) {
+    alert('Could not save — check your signal.'); return;
+  }
+  closeSheet();
+  await loadAll();
+  renderPast();
+  document.getElementById(`past-${date}`)?.classList.add('open');
+}
+function searchNodes(query, excludeIds) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return [];
+  const skip = new Set(excludeIds || []);
+  return (window.ALL_NODES || [])
+    .filter(n => !skip.has(n.id))
+    .map(n => {
+      const name = (n.name || '').toLowerCase();
+      const addr = (n.address || '').toLowerCase();
+      if (name.startsWith(q))     return { n, rank: 0 };
+      if (name.includes('(' + q)) return { n, rank: 1 };  // "hd" finds Metzcorp (HD Supply)
+      if (name.includes(q))       return { n, rank: 2 };
+      if (addr.includes(q))       return { n, rank: 3 };
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || a.n.name.localeCompare(b.n.name))
+    .slice(0, 10);
+}
+
+function renderSearchResults(inputId, resultsId, excludeIds) {
+  const raw = (document.getElementById(inputId)?.value || '').trim();
+  const el  = document.getElementById(resultsId);
+  if (!el) return;
+
+  if (!raw) {
+    el.innerHTML = `<div class="search-hint">Start typing to find a customer.</div>`;
+    return;
+  }
+
+  const hits = searchNodes(raw, excludeIds);
+  const rows = hits.map(({ n }) => `
+    <button type="button" class="search-row" onclick="pickSearchNode(${n.id})">
+      <div style="flex:1;min-width:0">
+        <div class="search-row-name">${esc(n.name)}</div>
+        <div class="search-row-addr">${esc(n.address || 'No address on file')}</div>
+      </div>
+      <div class="search-row-plus">+</div>
+    </button>`).join('');
+
+  const newRow = `
+    <button type="button" class="search-row search-row-new" onclick="startNewBusiness()">
+      <div style="flex:1;min-width:0">
+        <div class="search-row-name" style="color:var(--green)">
+          + Add "${esc(raw)}" as a new business
+        </div>
+        <div class="search-row-addr">You'll enter the address next</div>
+      </div>
+    </button>`;
+
+  el.innerHTML =
+    (rows || `<div class="search-empty">No customer matches "${esc(raw)}"</div>`) + newRow;
+}
+
+function pickSearchNode(nodeId) {
+  const n = (window.ALL_NODES || []).find(x => x.id === nodeId);
+  if (n) addTodayStopFromNode(n);
+}
+
+function startNewBusiness() {
+  const raw = (document.getElementById('sheet-search')?.value || '').trim();
+  newBusinessSheet(raw);
+}
 const manifestData = {
   name: "Alma Coffee Delivery",
   short_name: "Alma Delivery",
@@ -291,6 +488,49 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .search-row-new{border-style:dashed;border-color:var(--green)}
 .search-empty{font-size:12px;color:var(--gray4);padding:10px 2px;text-align:center}
 .search-hint{font-size:11px;color:var(--gray4);margin-top:6px}
+.search-input{width:100%;padding:12px 14px;border:1.5px solid var(--gray2);
+  border-radius:12px;font-size:16px;font-family:inherit;outline:none;
+  background:var(--gray0);-webkit-appearance:none}
+.search-input:focus{border-color:var(--navy);background:#fff}
+.search-results{margin-top:8px;max-height:46vh;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+.search-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:#fff;border:1px solid var(--gray2);border-radius:11px;
+  padding:11px 13px;margin-bottom:6px;cursor:pointer;font-family:inherit}
+.search-row:active{background:var(--gray0);border-color:var(--navy)}
+.search-row-name{font-size:14px;font-weight:600;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-row-addr{font-size:11px;color:var(--gray4);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-row-plus{color:var(--green);font-size:20px;font-weight:300;flex-shrink:0}
+.search-row-new{border-style:dashed;border-color:var(--green)}
+.search-empty{font-size:12px;color:var(--gray4);padding:10px 2px;text-align:center}
+.search-hint{font-size:11px;color:var(--gray4);margin-top:6px}
+.field-help{font-size:11px;color:var(--gray4);margin-top:3px;line-height:1.4}
+.pr-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.pr-date{font-size:16px;font-weight:700;color:var(--text)}
+.pr-stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+.pr-stat{display:flex;flex-direction:column;gap:1px}
+.pr-stat-val{font-size:14px;font-weight:600;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.pr-stat-lbl{font-size:9px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--gray4)}
+.pr-driver{font-size:12px;color:var(--navy);font-weight:600;margin-top:5px}
+.pr-stop{padding:10px 0;border-bottom:1px solid var(--gray1)}
+.pr-stop:last-child{border-bottom:none}
+.pr-stop-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.pr-stop-order{font-size:11.5px;color:var(--navy);font-weight:600;margin-top:2px}
+.pr-stop-times{font-size:10.5px;color:var(--gray4);margin-top:3px;
+  font-variant-numeric:tabular-nums}
+.pr-stop-note{background:#EFF7EF;border-left:3px solid var(--green);
+  border-radius:0 7px 7px 0;padding:7px 9px;margin-top:6px;
+  font-size:11.5px;color:var(--gray5);line-height:1.5}
+.pr-note-lbl{font-size:9px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--green);margin-bottom:2px}
+.pr-missing{font-size:11px;color:var(--gray3);font-style:italic}
+.pr-edit{background:var(--gray1);color:var(--gray5);border:none;
+  border-radius:8px;padding:6px 11px;font-size:11px;cursor:pointer;
+  font-family:inherit;font-weight:600;flex-shrink:0}
   
 </style>
 </head>
@@ -532,7 +772,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
         <input class="trip-manual-input" id="trip-manual-city" placeholder="City" style="max-width:120px"/>
       </div>
       <div class="trip-manual-row">
-        <input class="trip-manual-input" id="trip-manual-order" placeholder="Order # (optional)" style="max-width:140px"/>
+        <input class="trip-manual-input" id="trip-manual-order" placeholder="Order # (please include)" style="max-width:140px"/>
         <input class="trip-manual-input" id="trip-manual-note" placeholder="Note (optional)"/>
       </div>
       <button onclick="addTripManual()" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--navy);color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Add to route</button>
@@ -589,6 +829,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 const SUPA_URL = 'https://dclvscfotnhhknhbgzhm.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjbHZzY2ZvdG5oaGtuaGJnemhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDM4NzIsImV4cCI6MjEwMTUxOTg3Mn0.DMfpDUdRWUnddTp7KWLcSyJoeLymVVNTRd2zCbZbTVE';
+// ── Shared helpers. Safe to paste more than once. ──────────────────────────
 const DRIVER_ROUTE_COLS = [
   'id','date','stop_order','stop_name','stop_address','order_num',
   'instructions','stop_note','driver_note','status','node_id','source',
@@ -602,6 +843,31 @@ function toRouteRow(obj) {
   for (const c of DRIVER_ROUTE_COLS) if (obj[c] !== undefined) row[c] = obj[c];
   return row;
 }
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fmtTime(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleTimeString('en-US',
+    { hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtDuration(startIso, endIso) {
+  if (!startIso || !endIso) return null;
+  const mins = Math.round((new Date(endIso) - new Date(startIso)) / 60000);
+  if (mins < 0 || mins > 1440) return null;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+// window-scoped so re-pasting can never throw a redeclaration error
+window.ALL_SESSIONS   = window.ALL_SESSIONS   || [];
+window.ALL_NODES      = window.ALL_NODES      || [];
+window.CURRENT_DRIVER = window.CURRENT_DRIVER || null;
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -689,6 +955,31 @@ async function sbUpdate(table, id, patch) {
   } catch (e) { console.error(`Network failure [${table}]`, e); return { ok:false }; }
 }
 
+async function sbDelete(table, id) {
+  try {
+    const r = await fetch(
+      `${SUPA_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+    });
+    if (!r.ok) { console.error(`Delete failed [${table}] ${r.status}`); return { ok:false }; }
+    return { ok: true };
+  } catch (e) { console.error(`Network failure [${table}]`, e); return { ok:false }; }
+}
+
+async function geocodeAddress(addr) {
+  if (!addr) return { lat: null, lng: null };
+  try {
+    const r = await fetch(
+      'https://nominatim.openstreetmap.org/search?format=json&limit=1' +
+      `&countrycodes=us&q=${encodeURIComponent(addr)}`);
+    if (!r.ok) return { lat: null, lng: null };
+    const d = await r.json();
+    if (d.length) return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+  } catch (e) { console.warn('Geocode failed', e); }
+  return { lat: null, lng: null };
+}
+
 // ── PIN AUTH — disabled, auto-login on load ─────────────────────────────
 function pinTap(){}
 function updatePinDots(){}
@@ -738,47 +1029,41 @@ async function initApp() {
   await loadAll();
   renderHome();
 }
-
-async function loadAll() {
+  async function loadAll() {
   const today = new Date().toISOString().slice(0, 10);
 
   const pushed = await sbGet('driver_routes', `&date=eq.${today}`, 'stop_order.asc');
-  if (pushed && pushed.length) {
-    todayStops = pushed
-      .sort((a,b) => (parseInt(a.stop_order)||999) - (parseInt(b.stop_order)||999))
-      .map(r => ({
-        id: r.id, name: r.stop_name, address: r.stop_address,
-        orderNum: r.order_num || '', instructions: r.instructions || '',
-        stopNote: r.stop_note || '', driverNote: r.driver_note || '',
-        status: r.status || 'pending',
-        arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
-        lat: r.lat, lng: r.lng, nodeId: r.node_id, source: r.source || 'admin'
-      }));
-    if (!CURRENT_DRIVER) CURRENT_DRIVER = pushed.find(r => r.driver)?.driver || null;
-  } else {
-    todayStops = [];
-  }
+  todayStops = (pushed || [])
+    .sort((a, b) => (parseInt(a.stop_order) || 999) - (parseInt(b.stop_order) || 999))
+    .map(r => ({
+      id: r.id, name: r.stop_name, address: r.stop_address,
+      orderNum: r.order_num || '', instructions: r.instructions || '',
+      stopNote: r.stop_note || '', driverNote: r.driver_note || '',
+      status: r.status || 'pending',
+      arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
+      lat: r.lat, lng: r.lng, nodeId: r.node_id, source: r.source || 'admin'
+    }));
+  if (!window.CURRENT_DRIVER && pushed)
+    window.CURRENT_DRIVER = pushed.find(r => r.driver)?.driver || null;
 
   const allRoutes = await sbGet('driver_routes', '', 'date.asc,stop_order.asc');
   weekData = {};
-  if (allRoutes) allRoutes.forEach(r => {
-    if (!r.date) return;
-    (weekData[r.date] = weekData[r.date] || []).push(r);
+  (allRoutes || []).forEach(r => {
+    if (r.date) (weekData[r.date] = weekData[r.date] || []).push(r);
   });
 
-  ALL_SESSIONS = await sbGet('driver_route_sessions', '', 'date.desc') || [];
-  namedRoutes  = await sbGet('named_routes') || [];
-  contacts     = await sbGet('driver_contacts') || [];
-  issues       = await sbGet('driver_issues', '', 'created_at.desc') || [];
+  window.ALL_SESSIONS = await sbGet('driver_route_sessions', '', 'date.desc') || [];
+  namedRoutes = await sbGet('named_routes') || [];
+  contacts    = await sbGet('driver_contacts') || [];
+  issues      = await sbGet('driver_issues', '', 'created_at.desc') || [];
 
   const allNodes = await sbGet('nodes', '', 'name.asc');
   window.ALL_NODES = (allNodes || []).map(n => ({
     id: n.id, name: n.name, address: n.address, lat: n.lat, lng: n.lng
   }));
 
-  const badge = document.getElementById('today-badge');
-  if (badge) badge.textContent =
-    `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+  const b = document.getElementById('today-badge');
+  if (b) b.textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
 }
 
 // ── GPS ────────────────────────────────────────────────────────────────────
@@ -976,21 +1261,24 @@ async function loadSessionData() {
 }
 
 async function saveSessionData() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0, 10);
   routeSession.startOdo = document.getElementById('start-odo').value || null;
-  routeSession.endOdo = document.getElementById('end-odo').value || null;
+  routeSession.endOdo   = document.getElementById('end-odo').value   || null;
   updateMilesDisplay();
   try {
     await sbUpsert('driver_route_sessions', {
       id: routeSession.id || `sess-${today}`,
       date: today,
+      driver: getDriverName(),
       start_time: routeSession.startTime || null,
       end_time: routeSession.endTime || null,
       start_odo: routeSession.startOdo ? parseFloat(routeSession.startOdo) : null,
       end_odo: routeSession.endOdo ? parseFloat(routeSession.endOdo) : null,
     });
     if (!routeSession.id) routeSession.id = `sess-${today}`;
-  } catch(e) { console.warn('Session save failed', e); }
+  } catch (e) {
+    console.warn('Session save failed', e);
+  }
 }
 
 function updateMilesDisplay() {
@@ -1004,7 +1292,25 @@ function updateMilesDisplay() {
   }
 }
 
+function renderDriverLine() {
+  const panelEl = document.getElementById('route-session-panel');
+  if (!panelEl) return;
+  let drv = document.getElementById('session-driver-line');
+  if (!drv) {
+    drv = document.createElement('div');
+    drv.id = 'session-driver-line';
+    drv.style.cssText = 'font-size:11px;color:var(--navy);font-weight:600;margin-top:8px;cursor:pointer';
+    drv.onclick = () => { askDriverName(); renderSessionPanel(); saveSessionData(); };
+    panelEl.appendChild(drv);
+  }
+  const who = getDriverName();
+  drv.innerHTML = who
+    ? `Driver: ${esc(who)} <span style="color:var(--gray4);font-weight:400">(tap to change)</span>`
+    : `<span style="color:var(--gray3)">Tap to set driver</span>`;
+}
+
 function startRoute() {
+  askDriverName();
   routeSession.startTime = new Date().toISOString();
   renderSessionPanel();
   saveSessionData();
@@ -1015,8 +1321,6 @@ function endRoute() {
   renderSessionPanel();
   saveSessionData();
 }
-
-function editTime(field) {
   // field = 'start' or 'end'
   const current = field === 'start' ? routeSession.startTime : routeSession.endTime;
   const currentVal = current
@@ -1093,7 +1397,9 @@ function renderSessionPanel() {
   const panel = document.getElementById('route-session-panel');
   if (startFmt && !endFmt) panel.className = 'route-session started';
   else if (endFmt) panel.className = 'route-session ended';
-  else panel.className = 'route-session';
+   else panel.className = 'route-session';
+
+  renderDriverLine();
 }
 
 async function undoStop(idx) {
@@ -1275,32 +1581,98 @@ async function submitIssue() {
 // ── PAST ROUTES ─────────────────────────────────────────────────────────────
 function renderPast() {
   const el = document.getElementById('past-content');
-  // Group delivered stops by date
-  const allRoutes = Object.entries(weekData).sort((a, b) => b[0].localeCompare(a[0]));
-  if (!allRoutes.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No past routes yet.</div></div>`;
+  const sessions = (window.ALL_SESSIONS || [])
+    .slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (!sessions.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <div class="empty-state-text">No completed routes yet.<br>
+      Tap End Route when you finish and it'll appear here.</div></div>`;
     return;
   }
-  el.innerHTML = allRoutes.map(([date, stops]) => {
-    const delivered = stops.filter(s => s.status === 'delivered').length;
-    const d = new Date(date + 'T12:00:00');
-    const label = d.toLocaleDateString('en', {weekday:'long',month:'long',day:'numeric'});
-    return `<div class="past-route-card" onclick="togglePast('past-${date}')">
-      <div class="past-route-date">${label}</div>
-      <div class="past-route-meta">${stops.length} stops · ${delivered} delivered</div>
-      <div class="past-route-stops" id="past-${date}">
-        ${stops.map(s => `
-        <div class="past-stop-row">
-          <span>${s.stop_name || s.name}</span>
-          ${s.status === 'delivered' ? `<span class="past-stop-time">✓ ${s.delivered_at ? new Date(s.delivered_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'delivered'}</span>` : '<span style="color:var(--gray3)">—</span>'}
-        </div>`).join('')}
+
+  el.innerHTML = sessions.map(s => {
+    const stops = (weekData[s.date] || []).slice()
+      .sort((a, b) => (parseInt(a.stop_order) || 999) - (parseInt(b.stop_order) || 999));
+    const done     = stops.filter(x => x.status === 'delivered').length;
+    const miles    = (s.end_odo && s.start_odo) ? (s.end_odo - s.start_odo).toFixed(1) : null;
+    const duration = fmtDuration(s.start_time, s.end_time);
+    const live     = !s.end_time;
+    const d        = new Date(s.date + 'T12:00:00');
+    const label    = d.toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' });
+
+    return `<div class="past-route-card">
+      <div onclick="togglePast('past-${s.date}')" style="cursor:pointer">
+        <div class="pr-head">
+          <span class="pr-date">${label}</span>
+          ${live ? '<span class="tag tag-green">IN PROGRESS</span>' : ''}
+        </div>
+        <div class="pr-stat-row">
+          <div class="pr-stat">
+            <span class="pr-stat-val">${done} of ${stops.length}</span>
+            <span class="pr-stat-lbl">Delivered</span>
+          </div>
+          <div class="pr-stat">
+            <span class="pr-stat-val">${miles ? miles + ' mi' : '—'}</span>
+            <span class="pr-stat-lbl">Mileage</span>
+          </div>
+          <div class="pr-stat">
+            <span class="pr-stat-val">${duration || '—'}</span>
+            <span class="pr-stat-lbl">Route time</span>
+          </div>
+          <div class="pr-stat">
+            <span class="pr-stat-val">${fmtTime(s.start_time) || '—'}</span>
+            <span class="pr-stat-lbl">Started</span>
+          </div>
+          <div class="pr-stat">
+            <span class="pr-stat-val">${fmtTime(s.end_time) || '—'}</span>
+            <span class="pr-stat-lbl">Ended</span>
+          </div>
+        </div>
+        <div class="pr-driver">${s.driver ? esc(s.driver)
+          : '<span class="pr-missing">Driver not recorded</span>'}</div>
+      </div>
+
+      <div class="past-route-stops" id="past-${s.date}">
+        <button class="pr-edit" style="width:100%;padding:9px;margin:12px 0 10px;font-size:12px"
+                onclick="editSessionSheet('${s.date}')">Edit route details</button>
+
+        ${stops.map((x, i) => {
+          const svc = (x.arrived_at && x.delivered_at)
+            ? Math.round((new Date(x.delivered_at) - new Date(x.arrived_at)) / 60000) : null;
+          return `<div class="pr-stop">
+            <div style="display:flex;align-items:flex-start;gap:9px">
+              <span class="stop-num ${x.status === 'delivered' ? 'delivered-num' : ''}"
+                    style="width:22px;height:22px;font-size:10px;margin-top:1px">${x.status === 'delivered' ? '✓' : i + 1}</span>
+              <div style="flex:1;min-width:0">
+                <div class="pr-stop-name">${esc(x.stop_name) || '(no name)'}</div>
+                ${x.order_num
+                  ? `<div class="pr-stop-order">Order ${esc(x.order_num)}</div>`
+                  : `<div class="pr-stop-order"><span class="pr-missing">No order number</span></div>`}
+                <div class="pr-stop-times">${
+                  (fmtTime(x.arrived_at) ? 'Arrived ' + fmtTime(x.arrived_at) : '') +
+                  (fmtTime(x.arrived_at) && fmtTime(x.delivered_at) ? ' · ' : '') +
+                  (fmtTime(x.delivered_at) ? 'Delivered ' + fmtTime(x.delivered_at) : '') +
+                  (svc !== null ? ` · <b>${svc} min on site</b>` : '')
+                }</div>
+                ${x.driver_note ? `
+                <div class="pr-stop-note">
+                  <div class="pr-note-lbl">Driver note</div>${esc(x.driver_note)}
+                </div>` : ''}
+              </div>
+              <button class="pr-edit"
+                onclick="event.stopPropagation();editStopSheet('${x.id}','${s.date}')">Edit</button>
+            </div>
+          </div>`;
+        }).join('') || '<div class="search-empty">No stops recorded.</div>'}
       </div>
     </div>`;
   }).join('');
 }
 
 function togglePast(id) {
-  document.getElementById(id).classList.toggle('open');
+  document.getElementById(id)?.classList.toggle('open');
 }
 
 // ── SHEETS (modal bottom sheets) ────────────────────────────────────────────
@@ -1314,39 +1686,95 @@ function closeSheet() {
 
 function addStopSheet() {
   openSheet(`
-    <div class="sheet-title">Add a Stop</div>
-    <div class="sheet-field"><div class="sheet-label">Business name</div>
-      <input class="sheet-input" id="sh-name" placeholder="e.g. Stout Brothers"/></div>
-    <div class="sheet-field"><div class="sheet-label">Address</div>
-      <input class="sheet-input" id="sh-addr" placeholder="Street, City, GA"/></div>
+    <div class="sheet-title">Add a stop</div>
+    <input class="search-input" id="sheet-search" autocomplete="off"
+           autocapitalize="words" autocorrect="off"
+           placeholder="Start typing a business name…"
+           oninput="renderSearchResults('sheet-search','sheet-search-results',todayStops.map(s=>s.nodeId).filter(Boolean))"/>
+    <div class="search-results" id="sheet-search-results"></div>
+  `);
+  renderSearchResults('sheet-search', 'sheet-search-results', []);
+  setTimeout(() => document.getElementById('sheet-search')?.focus(), 250);
+}
+
+async function addTodayStopFromNode(n) {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = toRouteRow({
+    id: `dr-${today}-n${n.id}-${Date.now()}`,
+    date: today,
+    stop_order: String(todayStops.length + 1),
+    stop_name: n.name,
+    stop_address: n.address || '',
+    order_num: '', stop_note: '', instructions: '',
+    status: 'pending', source: 'driver', node_id: n.id,
+    lat: n.lat || null, lng: n.lng || null,
+    driver: window.CURRENT_DRIVER || null
+  });
+
+  const res = await sbUpsert('driver_routes', row);
+  if (!res.ok) { alert('Could not save that stop. Check your signal.'); return; }
+
+  todayStops.push({
+    id: row.id, name: row.stop_name, address: row.stop_address,
+    orderNum: '', stopNote: '', driverNote: '', instructions: '',
+    status: 'pending', lat: row.lat, lng: row.lng,
+    nodeId: n.id, source: 'driver'
+  });
+  closeSheet();
+  renderStopList();
+  const b = document.getElementById('today-badge');
+  if (b) b.textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
+}
+
+function newBusinessSheet(prefill) {
+  openSheet(`
+    <div class="sheet-title">New business</div>
+    <div class="sheet-field"><div class="sheet-label">Business name *</div>
+      <input class="sheet-input" id="nb-name" value="${esc(prefill || '')}"/></div>
+    <div class="sheet-field"><div class="sheet-label">Street address *</div>
+      <input class="sheet-input" id="nb-addr" placeholder="240 Chambers St"/></div>
+    <div class="sheet-field"><div class="sheet-label">City</div>
+      <input class="sheet-input" id="nb-city" placeholder="Woodstock"/></div>
     <div class="sheet-field"><div class="sheet-label">Order number</div>
-      <input class="sheet-input" id="sh-order" placeholder="#129010 (optional)"/></div>
-    <div class="sheet-field"><div class="sheet-label">Delivery note</div>
-      <input class="sheet-input" id="sh-note" placeholder="e.g. call ahead (optional)"/></div>
-    <button class="sheet-btn sheet-btn-green" onclick="saveAddStop()">Add to Today's Route</button>
+      <input class="sheet-input" id="nb-order" placeholder="#135931"/>
+      <div class="field-help">Please include this if you have it — it links the delivery back to the order.</div></div>
+    <button class="sheet-btn sheet-btn-green" onclick="saveNewBusinessStop()">Add to today's route</button>
   `);
 }
 
-async function saveAddStop() {
-  const name = document.getElementById('sh-name').value.trim();
-  const addr = document.getElementById('sh-addr').value.trim();
-  if (!name || !addr) return;
-  const stop = {
-    id: 'stop-' + Date.now(),
-    stop_name: name, name,
-    stop_address: addr, address: addr,
-    order_num: document.getElementById('sh-order').value.trim(),
-    stop_note: document.getElementById('sh-note').value.trim(),
-    status: 'pending',
-    date: new Date().toISOString().slice(0, 10),
-    stop_order: todayStops.length + 1,
-    lat: null, lng: null, instructions: ''
-  };
-  todayStops.push(stop);
-  await sbUpsert('driver_routes', stop);
+async function saveNewBusinessStop() {
+  const name = document.getElementById('nb-name').value.trim();
+  const addr = document.getElementById('nb-addr').value.trim();
+  const city = document.getElementById('nb-city').value.trim();
+  if (!name || !addr) { alert('Name and street address are both required.'); return; }
+
+  const full = [addr, city, 'GA'].filter(Boolean).join(', ');
+  const coords = await geocodeAddress(full);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const row = toRouteRow({
+    id: `dr-${today}-m${Date.now()}`, date: today,
+    stop_order: String(todayStops.length + 1),
+    stop_name: name, stop_address: full,
+    order_num: document.getElementById('nb-order').value.trim(),
+    stop_note: '', instructions: '', status: 'pending',
+    source: 'driver', node_id: null,
+    lat: coords.lat, lng: coords.lng,
+    driver: window.CURRENT_DRIVER || null
+  });
+
+  const res = await sbUpsert('driver_routes', row);
+  if (!res.ok) { alert('Could not save that stop. Check your signal.'); return; }
+
+  todayStops.push({
+    id: row.id, name, address: full, orderNum: row.order_num,
+    stopNote: '', driverNote: '', instructions: '', status: 'pending',
+    lat: row.lat, lng: row.lng, nodeId: null, source: 'driver'
+  });
   closeSheet();
   renderStopList();
-  document.getElementById('today-badge').textContent = `${todayStops.length} stop${todayStops.length!==1?'s':''}`;
+  const b = document.getElementById('today-badge');
+  if (b) b.textContent = `${todayStops.length} stop${todayStops.length !== 1 ? 's' : ''}`;
 }
 
 function addWeekStopSheet() {
