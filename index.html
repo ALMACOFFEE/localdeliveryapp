@@ -246,6 +246,131 @@ document.addEventListener('visibilitychange', async () => {
     if (currentScreen === 'home-screen')  renderHome();
   } catch (e) { console.warn('Foreground refresh failed', e); }
 });
+
+// ── ALMA NODE SEARCH ─────────────────────────────────────────────────────
+// Shared by the admin planner and the driver app. Safe to paste repeatedly.
+
+function almaEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function almaNormalize(s) {
+  return String(s == null ? '' : s)
+    .toLowerCase()
+    .replace(/['‘’]/g, '')   // arlowe's -> arlowes
+    .replace(/[^a-z0-9]+/g, ' ')       // &, (), -, . all become spaces
+    .trim();
+}
+
+function almaSearchNodes(query, nodes, limit) {
+  var list = nodes || window.ALL_NODES || [];
+  var q = almaNormalize(query);
+  if (!q) return [];
+  var tokens = q.split(' ').filter(Boolean);
+  var out = [];
+
+  for (var i = 0; i < list.length; i++) {
+    var n = list[i];
+    var name = almaNormalize(n.name);
+    var addr = almaNormalize(n.address);
+    var nameWords = name.split(' ').filter(Boolean);
+    var score = 0, ok = true;
+
+    for (var t = 0; t < tokens.length; t++) {
+      var tok = tokens[t];
+      if (name.indexOf(tok) === 0) {
+        score += 100;                                  // name starts with it
+      } else if (nameWords.some(function (w) { return w.indexOf(tok) === 0; })) {
+        score += 60;                                   // a word in the name starts with it
+      } else if (name.indexOf(tok) !== -1) {
+        score += 25;                                   // appears mid-name
+      } else if (addr.indexOf(tok) !== -1) {
+        score += 5;                                    // only in the address
+      } else {
+        ok = false; break;                             // this token matched nothing
+      }
+    }
+    if (!ok) continue;
+    score -= Math.min(name.length, 40) * 0.1;          // nudge shorter names up
+    out.push({ node: n, score: score });
+  }
+
+  out.sort(function (a, b) {
+    return (b.score - a.score) ||
+           String(a.node.name).localeCompare(String(b.node.name));
+  });
+  return out.slice(0, limit || 8).map(function (x) { return x.node; });
+}
+
+// cfg = { inputId, resultsId, onPick(node), onAddNew(typedText), limit }
+function almaWireSearch(cfg) {
+  var input = document.getElementById(cfg.inputId);
+  var out   = document.getElementById(cfg.resultsId);
+  if (!input || !out) return false;
+
+  function draw() {
+        var all = window.ALL_NODES || [];
+    var q = input.value.trim();
+
+    if (!all.length) {
+      out.innerHTML = '<div class="ns-msg">Loading businesses…</div>';
+      return;
+    }
+
+    var skip  = cfg.exclude ? (cfg.exclude() || []) : [];
+    var nodes = skip.length
+      ? all.filter(function (n) { return skip.indexOf(n.id) === -1; })
+      : all;
+    if (!q) { out.innerHTML = ''; out._nsHits = []; return; }
+
+    var hits = almaSearchNodes(q, nodes, cfg.limit || 8);
+    out._nsHits = hits;
+
+    if (!hits.length) {
+      out.innerHTML =
+        '<div class="ns-msg">No match for “' + almaEsc(q) + '”</div>' +
+        (cfg.onAddNew
+          ? '<button type="button" class="ns-add" data-ns-addnew="1">+ Add as a new business</button>'
+          : '');
+      return;
+    }
+
+    out.innerHTML = hits.map(function (n, i) {
+      return '<button type="button" class="ns-hit" data-ns-idx="' + i + '">' +
+               '<span class="ns-name">' + almaEsc(n.name) + '</span>' +
+               '<span class="ns-addr">' + almaEsc(n.address || '') + '</span>' +
+             '</button>';
+    }).join('');
+  }
+
+  if (input.dataset.nsWired === '1') { draw(); return true; }
+  input.dataset.nsWired = '1';
+
+  input.addEventListener('input', draw);
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var n = (out._nsHits || [])[0];
+    if (n && cfg.onPick) cfg.onPick(n);
+  });
+
+  out.addEventListener('click', function (e) {
+    if (e.target.closest('[data-ns-addnew]')) {
+      if (cfg.onAddNew) cfg.onAddNew(input.value.trim());
+      return;
+    }
+    var hit = e.target.closest('[data-ns-idx]');
+    if (!hit) return;
+    var n = (out._nsHits || [])[parseInt(hit.getAttribute('data-ns-idx'), 10)];
+    if (n && cfg.onPick) cfg.onPick(n);
+  });
+
+  return true;
+}
+  
 </script>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -531,6 +656,22 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .pr-edit{background:var(--gray1);color:var(--gray5);border:none;
   border-radius:8px;padding:6px 11px;font-size:11px;cursor:pointer;
   font-family:inherit;font-weight:600;flex-shrink:0}
+
+.ns-msg { padding: 10px 12px; font-size: 13px; color: var(--gray3, #8a8a8a); }
+.ns-hit {
+  display: block; width: 100%; text-align: left;
+  padding: 10px 12px; border: 0; border-bottom: 1px solid rgba(0,0,0,.07);
+  background: #fff; cursor: pointer; font: inherit;
+}
+.ns-hit:hover, .ns-hit:focus { background: #f4f3fa; }
+.ns-hit:last-child { border-bottom: 0; }
+.ns-name { display: block; font-weight: 600; font-size: 14px; color: var(--navy, #1a1a1a); }
+.ns-addr { display: block; font-size: 12px; color: var(--gray3, #8a8a8a); margin-top: 2px; }
+.ns-add {
+  display: block; width: 100%; padding: 10px 12px; border: 0;
+  background: #f4f3fa; color: #352984; font-weight: 600; font-size: 13px;
+  cursor: pointer; font-family: inherit;
+}
   
 </style>
 </head>
@@ -1691,12 +1832,28 @@ function addStopSheet() {
     <div class="sheet-title">Add a stop</div>
     <input class="search-input" id="sheet-search" autocomplete="off"
            autocapitalize="words" autocorrect="off"
-           placeholder="Start typing a business name…"
-           oninput="renderSearchResults('sheet-search','sheet-search-results',todayStops.map(s=>s.nodeId).filter(Boolean))"/>
+           placeholder="Start typing a business name…"/>
     <div class="search-results" id="sheet-search-results"></div>
   `);
-  renderSearchResults('sheet-search', 'sheet-search-results', []);
-  setTimeout(() => document.getElementById('sheet-search')?.focus(), 250);
+
+  almaWireSearch({
+    inputId:   'sheet-search',
+    resultsId: 'sheet-search-results',
+    limit:     8,
+    exclude:   function () {
+                 return todayStops.map(function (s) { return s.nodeId; })
+                                  .filter(Boolean);
+               },
+    onPick:    function (n) { addTodayStopFromNode(n); },
+    onAddNew:  function (typed) { newBusinessSheet(typed); }
+  });
+
+  document.getElementById('sheet-search-results').innerHTML =
+    '<div class="ns-msg">Start typing to find a customer.</div>';
+
+  setTimeout(function () {
+    document.getElementById('sheet-search')?.focus();
+  }, 250);
 }
 
 async function addTodayStopFromNode(n) {
