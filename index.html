@@ -1381,11 +1381,28 @@ function getSessionKey() {
 }
 
 async function loadSessionData() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = new Date().toISOString().slice(0, 10);
+
+  function freshSession() {
+    routeSession = {
+      startTime: null, endTime: null,
+      startOdo: null, endOdo: null,
+      date: today, id: null
+    };
+    const a = document.getElementById('start-odo');
+    const b = document.getElementById('end-odo');
+    if (a) a.value = '';
+    if (b) b.value = '';
+  }
+
+  // Anything still in memory from a different day is stale. Drop it before
+  // we even ask Supabase — this is the Friday-shows-Tuesday case.
+  if (routeSession.date && routeSession.date !== today) freshSession();
+
   try {
     const r = await fetch(
       `${SUPA_URL}/rest/v1/driver_route_sessions?date=eq.${today}&select=*&limit=1`,
-      {headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`}}
+      { headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` } }
     );
     if (r.ok) {
       const rows = await r.json();
@@ -1393,12 +1410,18 @@ async function loadSessionData() {
         const s = rows[0];
         routeSession = {
           startTime: s.start_time, endTime: s.end_time,
-          startOdo: s.start_odo, endOdo: s.end_odo, date: today, id: s.id
+          startOdo: s.start_odo, endOdo: s.end_odo,
+          date: today, id: s.id
         };
-        renderSessionPanel();
+      } else {
+        freshSession();   // no session today — start clean, never reuse an old id
       }
     }
-  } catch(e) {}
+  } catch (e) {
+    console.warn('Session load failed', e);
+  }
+
+  renderSessionPanel();
 }
 
 async function saveSessionData() {
@@ -1532,8 +1555,12 @@ function renderSessionPanel() {
   }
 
   // Odometer fields
-  if (routeSession.startOdo) document.getElementById('start-odo').value = routeSession.startOdo;
-  if (routeSession.endOdo) document.getElementById('end-odo').value = routeSession.endOdo;
+   const soEl = document.getElementById('start-odo');
+  const eoEl = document.getElementById('end-odo');
+  if (soEl && document.activeElement !== soEl)
+    soEl.value = routeSession.startOdo != null ? routeSession.startOdo : '';
+  if (eoEl && document.activeElement !== eoEl)
+    eoEl.value = routeSession.endOdo != null ? routeSession.endOdo : '';
   updateMilesDisplay();
 
   // Panel border
