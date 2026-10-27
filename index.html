@@ -972,7 +972,7 @@ const SUPA_URL = 'https://dclvscfotnhhknhbgzhm.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjbHZzY2ZvdG5oaGtuaGJnemhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NDM4NzIsImV4cCI6MjEwMTUxOTg3Mn0.DMfpDUdRWUnddTp7KWLcSyJoeLymVVNTRd2zCbZbTVE';
 // ── Shared helpers. Safe to paste more than once. ──────────────────────────
 const DRIVER_ROUTE_COLS = [
-  'id','date','stop_order','stop_name','stop_address','order_num',
+  'id','date','stop_order','stop_name','stop_address','order_num','box_count',
   'instructions','stop_note','driver_note','status','node_id','source',
   'arrived_at','arrived_lat','arrived_lng',
   'delivered_at','delivered_lat','delivered_lng',
@@ -1178,7 +1178,8 @@ async function initApp() {
     .sort((a, b) => (parseInt(a.stop_order) || 999) - (parseInt(b.stop_order) || 999))
     .map(r => ({
       id: r.id, name: r.stop_name, address: r.stop_address,
-      orderNum: r.order_num || '', instructions: r.instructions || '',
+      orderNum: r.order_num || '', boxCount: r.box_count,
+      instructions: r.instructions || '',
       stopNote: r.stop_note || '', driverNote: r.driver_note || '',
       status: r.status || 'pending',
       arrivedAt: r.arrived_at, deliveredAt: r.delivered_at,
@@ -1283,7 +1284,11 @@ function renderStopList() {
   const delivered = todayStops.filter(s => s.status === 'delivered').length;
   const total = todayStops.length;
 
-  document.getElementById('today-progress-label').textContent = `${delivered} of ${total} delivered`;
+    const bt = boxTotals();
+  document.getElementById('today-progress-label').textContent =
+    `${delivered} of ${total} delivered`
+    + (total ? `   ·   ${bt.boxes} box${bt.boxes === 1 ? '' : 'es'}` : '')
+    + (bt.missing ? `   ·   ${bt.missing} not counted` : '');
   document.getElementById('progress-fill').style.width = total ? `${(delivered/total)*100}%` : '0%';
 
   if (!total) { el.innerHTML = ''; empty.style.display = 'block'; return; }
@@ -1303,7 +1308,15 @@ function renderStopList() {
           <div style="flex:1;min-width:0">
             <div class="stop-name">${s.name}</div>
             <div class="stop-addr">${s.address}</div>
-            ${s.orderNum ? `<div class="stop-order">Order: ${s.orderNum}</div>` : ''}
+                        ${(s.orderNum || s.boxCount != null)
+              ? `<div class="stop-order" onclick="orderBoxSheet(${i})" style="cursor:pointer">
+                   ${s.orderNum ? `Order: ${esc(s.orderNum)}` : '<span style="color:var(--gray3)">No order #</span>'}
+                   &nbsp;·&nbsp;
+                   ${s.boxCount != null
+                     ? `<b>${s.boxCount} box${s.boxCount == 1 ? '' : 'es'}</b>`
+                     : '<span style="color:var(--gray3)">boxes not set</span>'}
+                 </div>`
+              : `<div class="stop-order" onclick="orderBoxSheet(${i})" style="cursor:pointer;color:var(--gray3)">+ Add order # / boxes</div>`}
             ${s.stopNote ? `<div class="stop-note">📝 ${s.stopNote}</div>` : ''}
           </div>
         </div>
@@ -2171,7 +2184,61 @@ window.addEventListener('DOMContentLoaded', async function() {
   await loadAll();
   renderHome();
 });
+// ── ORDER NUMBERS + BOX COUNTS ───────────────────────────────────────────
+// Safe to paste more than once.
 
+function boxTotals() {
+  var boxes = 0, missing = 0;
+  (todayStops || []).forEach(function (s) {
+    if (s.boxCount === null || s.boxCount === undefined || s.boxCount === '') missing++;
+    else boxes += Number(s.boxCount) || 0;
+  });
+  return { boxes: boxes, missing: missing };
+}
+
+function orderBoxSheet(idx) {
+  var s = (todayStops || [])[idx];
+  if (!s) return;
+  openSheet(
+    '<div class="sheet-title">' + esc(s.name) + '</div>' +
+    '<div class="sheet-field"><div class="sheet-label">Order number(s)</div>' +
+      '<input class="sheet-input" id="ob-order" autocomplete="off" ' +
+      'value="' + esc(s.orderNum || '') + '" placeholder="126742, 126810"/>' +
+      '<div class="field-help">Two orders for this stop? Separate them with a comma.</div></div>' +
+    '<div class="sheet-field"><div class="sheet-label">Total boxes for this stop</div>' +
+      '<input class="sheet-input" id="ob-boxes" type="number" inputmode="numeric" ' +
+      'min="0" step="1" value="' + (s.boxCount == null ? '' : s.boxCount) + '" placeholder="3"/>' +
+      '<div class="field-help">Every box for this stop, across all orders above.</div></div>' +
+    '<button class="sheet-btn sheet-btn-green" onclick="saveOrderBoxes(' + idx + ')">Save</button>'
+  );
+  setTimeout(function () {
+    var el = document.getElementById('ob-order'); if (el) el.focus();
+  }, 250);
+}
+
+async function saveOrderBoxes(idx) {
+  var s = (todayStops || [])[idx];
+  if (!s) return;
+
+  var raw = (document.getElementById('ob-order').value || '').trim();
+  var orderNum = raw.split(',').map(function (x) { return x.trim(); })
+                    .filter(Boolean).join(', ');
+
+  var bRaw = (document.getElementById('ob-boxes').value || '').trim();
+  var boxCount = bRaw === '' ? null : Math.max(0, parseInt(bRaw, 10) || 0);
+
+  var res = await sbUpdate('driver_routes', s.id, {
+    order_num: orderNum || null,
+    box_count: boxCount
+  });
+  if (!res || !res.ok) { alert('Could not save that. Check your signal.'); return; }
+
+  s.orderNum = orderNum;
+  s.boxCount = boxCount;
+  closeSheet();
+  renderStopList();
+}
+  
 </script>
 </body>
 </html>
